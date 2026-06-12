@@ -1,0 +1,26 @@
+# ===== Web framework =====
+Flask==3.0.3
+Flask-SQLAlchemy==3.1.1
+Flask-JWT-Extended==4.6.0
+Flask-Cors==4.0.1
+python-dotenv==1.0.1
+
+# ===== Database drivers =====
+PyMySQL==1.1.1            # MySQL 8.0 (thesis target)
+# SQLite is built into Python (dev default)
+
+# ===== Security =====
+bcrypt==4.2.0            # NFR-06 password hashing
+
+# ===== PDF processing =====
+PyMuPDF==1.24.10         # FR-07 text extraction
+
+# ===== AI / NLP (local inference, NFR-08) =====
+spacy==3.7.6             # FR-11 preprocessing + NER
+transformers==4.44.2     # FR-12/13 BERT + BART
+torch==2.4.1             # transformers backend
+sentence-transformers==3.1.1   # FR-37 Sentence-BERT
+faiss-cpu==1.8.0         # FR-37 FAISS vector index
+
+# ===== Utilities =====
+numpy==1.26.4

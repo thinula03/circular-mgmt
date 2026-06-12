@@ -1,0 +1,37 @@
+# ---- Python / Flask ----
+backend/.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+instance/
+*.sqlite3
+*.db
+.claude
+
+# ---- Environment ----
+.env
+backend/.env
+frontend/.env
+
+# ---- AI model cache & FAISS index ----
+backend/model_cache/
+backend/.cache/
+*.faiss
+*.index
+backend/app/ai/index_store/
+
+# ---- Uploaded circulars (PDFs) ----
+backend/uploads/
+
+# ---- Node / React ----
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+
+# ---- Editor / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
