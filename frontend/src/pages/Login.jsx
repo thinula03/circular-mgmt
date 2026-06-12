@@ -94,9 +94,7 @@ export default function Login() {
           </Link>
         </div>
 
-        <p className="mt-6 text-center text-xs text-ink-muted">
-          Demo accounts seed with password <code>password123</code>
-        </p>
+         
       </div>
     </div>
   );
