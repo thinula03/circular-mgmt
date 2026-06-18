@@ -9,6 +9,7 @@ import Icon from "./Icon.jsx";
 const NAV = [
   { to: "/", label: "Circulars", icon: "document", roles: ["Employee", "Manager", "Administrator"] },
   { to: "/compliance", label: "Compliance", icon: "chart", roles: ["Manager", "Administrator"] },
+  { to: "/requests", label: "Requests", icon: "inbox", roles: ["Manager", "Administrator"] },
   { to: "/upload", label: "Upload", icon: "upload", roles: ["Administrator"] },
   { to: "/users", label: "Users", icon: "users", roles: ["Administrator"] },
 ];

@@ -24,6 +24,7 @@ export default function AdminUpload() {
   const [classifications, setClassifications] = useState([]);
   const [distribution, setDistribution] = useState(null);
   const [ackDays, setAckDays] = useState(7);
+  const [broadcast, setBroadcast] = useState(false);
   const [sumError, setSumError] = useState("");
 
   async function handleSummarize() {
@@ -31,7 +32,7 @@ export default function AdminUpload() {
     setSummarizing(true);
     try {
       const res = await client.post(
-        `/circulars/${result.circular.id}/summarize?target_words=150&ack_days=${ackDays}`,
+        `/circulars/${result.circular.id}/summarize?target_words=150&ack_days=${ackDays}&broadcast=${broadcast}`,
         {},
         { timeout: 240000 } // first run loads BART (~1–2 min on CPU)
       );
@@ -133,7 +134,7 @@ export default function AdminUpload() {
           <div className="border-t border-ink-line pt-4">
             {!summary ? (
               <div className="space-y-3">
-                <div className="flex items-end gap-3">
+                <div className="flex flex-wrap items-end gap-4">
                   <div>
                     <label className="mb-1 block text-xs font-medium uppercase text-ink-muted">
                       Acknowledge within (days)
@@ -147,6 +148,15 @@ export default function AdminUpload() {
                       className="input w-28"
                     />
                   </div>
+                  <label className="flex cursor-pointer items-center gap-2 pb-2 text-sm text-ink">
+                    <input
+                      type="checkbox"
+                      checked={broadcast}
+                      onChange={(e) => setBroadcast(e.target.checked)}
+                      className="h-4 w-4 rounded border-ink-line text-brand-500 focus:ring-brand-400"
+                    />
+                    Send to all departments
+                  </label>
                 </div>
                 <button
                   onClick={handleSummarize}

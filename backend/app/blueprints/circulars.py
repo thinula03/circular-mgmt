@@ -10,7 +10,9 @@ from sqlalchemy import or_
 
 from ..extensions import db
 from ..models.circular import Circular, Summary, Classification
-from ..models.engagement import Acknowledgement
+from ..models.engagement import Acknowledgement, Notification
+from ..models.identity import User, CircularDepartment
+from ..models.system import ChangeRequest
 from ..services.security import roles_required
 from ..services import audit, pdf_extract, distribution
 from ..ai import get_engine, get_index
@@ -122,6 +124,180 @@ def download_circular(circular_id):
     download_name = f"Circular_{circular.circular_number.replace('/', '-')}.pdf"
     return send_file(circular.file_path, mimetype="application/pdf",
                      as_attachment=True, download_name=download_name)
+
+
+@circulars_bp.patch("/<int:circular_id>")
+@jwt_required()
+@roles_required("Administrator")
+def edit_circular(circular_id):
+    """Administrators edit a circular's metadata (number, title, date, priority)."""
+    circular = Circular.query.get(circular_id)
+    if not circular:
+        return jsonify({"error": "Circular not found."}), 404
+    data = request.get_json(silent=True) or {}
+
+    if "circular_number" in data:
+        num = (data["circular_number"] or "").strip()
+        if not num:
+            return jsonify({"error": "Circular number cannot be empty."}), 400
+        clash = Circular.query.filter(Circular.circular_number == num,
+                                      Circular.id != circular.id).first()
+        if clash:
+            return jsonify({"error": f"Circular '{num}' already exists."}), 409
+        circular.circular_number = num
+    if "title" in data and data["title"].strip():
+        circular.title = data["title"].strip()
+    if "priority" in data and data["priority"] in Circular.PRIORITIES:
+        circular.priority = data["priority"]
+    if "issue_date" in data:
+        raw = (data["issue_date"] or "").strip()
+        if raw:
+            try:
+                circular.issue_date = datetime.strptime(raw, "%Y-%m-%d").date()
+            except ValueError:
+                return jsonify({"error": "issue_date must be YYYY-MM-DD."}), 400
+        else:
+            circular.issue_date = None
+
+    db.session.commit()
+    audit.record("CIRCULAR_EDITED", user_id=int(get_jwt_identity()),
+                 entity_type="Circular", entity_id=circular.id)
+    return jsonify(circular.to_dict())
+
+
+@circulars_bp.delete("/<int:circular_id>")
+@jwt_required()
+@roles_required("Administrator")
+def delete_circular(circular_id):
+    """Administrators delete a circular and all of its related records."""
+    circular = Circular.query.get(circular_id)
+    if not circular:
+        return jsonify({"error": "Circular not found."}), 404
+
+    number = circular.circular_number
+    # Remove the stored PDF from disk.
+    if circular.file_path and os.path.exists(circular.file_path):
+        try:
+            os.remove(circular.file_path)
+        except OSError:
+            pass
+
+    # Delete children explicitly (avoids ORM null-ing NOT NULL FKs), then the row.
+    Acknowledgement.query.filter_by(circular_id=circular.id).delete()
+    Notification.query.filter_by(circular_id=circular.id).delete()
+    Classification.query.filter_by(circular_id=circular.id).delete()
+    CircularDepartment.query.filter_by(circular_id=circular.id).delete()
+    ChangeRequest.query.filter_by(circular_id=circular.id).delete()
+    Summary.query.filter_by(circular_id=circular.id).delete()
+    Circular.query.filter_by(id=circular.id).delete()
+    db.session.commit()
+
+    # FR-40: rebuild the vector index so the deleted circular is no longer searchable.
+    try:
+        get_index(current_app.config).build(
+            Circular.query.filter_by(status="published").all()
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+    audit.record("CIRCULAR_DELETED", user_id=int(get_jwt_identity()),
+                 entity_type="Circular", entity_id=circular_id, detail=number)
+    return jsonify({"message": f"Circular {number} deleted."})
+
+
+@circulars_bp.post("/<int:circular_id>/request")
+@jwt_required()
+@roles_required("Manager", "Administrator")
+def request_change(circular_id):
+    """Managers flag a problem with a circular; all administrators are notified."""
+    circular = Circular.query.get(circular_id)
+    if not circular:
+        return jsonify({"error": "Circular not found."}), 404
+    data = request.get_json(silent=True) or {}
+    message = (data.get("message") or "").strip()
+    if not message:
+        return jsonify({"error": "Please describe the issue."}), 400
+
+    requester = User.query.get(int(get_jwt_identity()))
+    change = ChangeRequest(circular_id=circular.id, requester_id=requester.id,
+                           message=message)
+    db.session.add(change)
+
+    note = (f"Change request from {requester.full_name} on circular "
+            f"{circular.circular_number}: {message}")
+    admins = User.query.filter_by(role="Administrator", is_active=True).all()
+    for admin in admins:
+        db.session.add(Notification(user_id=admin.id, circular_id=circular.id, message=note))
+    db.session.commit()
+    audit.record("CIRCULAR_CHANGE_REQUESTED", user_id=requester.id,
+                 entity_type="Circular", entity_id=circular.id, detail=message[:200])
+    return jsonify({"message": "Your request has been sent to the administrators."})
+
+
+@circulars_bp.get("/requests")
+@jwt_required()
+@roles_required("Manager", "Administrator")
+def list_requests():
+    """Managers see their own change requests; administrators see all."""
+    uid = int(get_jwt_identity())
+    role = get_jwt().get("role")
+    requester = db.aliased(User)
+    resolver = db.aliased(User)
+    query = (db.session.query(ChangeRequest, Circular, requester, resolver)
+             .join(Circular, Circular.id == ChangeRequest.circular_id)
+             .join(requester, requester.id == ChangeRequest.requester_id)
+             .outerjoin(resolver, resolver.id == ChangeRequest.resolved_by))
+    if role == "Manager":
+        query = query.filter(ChangeRequest.requester_id == uid)
+    rows = query.order_by(ChangeRequest.created_at.desc()).all()
+    return jsonify([
+        {
+            "id": cr.id,
+            "circular_id": cr.circular_id,
+            "circular_number": circ.circular_number,
+            "circular_title": circ.title,
+            "message": cr.message,
+            "status": cr.status,
+            "admin_reply": cr.admin_reply,
+            "requester": req.full_name,
+            "resolved_by": res.full_name if res else None,
+            "created_at": cr.created_at.isoformat() if cr.created_at else None,
+            "resolved_at": cr.resolved_at.isoformat() if cr.resolved_at else None,
+        }
+        for cr, circ, req, res in rows
+    ])
+
+
+@circulars_bp.post("/requests/<int:req_id>/resolve")
+@jwt_required()
+@roles_required("Administrator")
+def resolve_request(req_id):
+    """Administrator replies to a request, marking it Solved or Not Solved."""
+    change = ChangeRequest.query.get(req_id)
+    if not change:
+        return jsonify({"error": "Request not found."}), 404
+    data = request.get_json(silent=True) or {}
+    status = data.get("status")
+    reply = (data.get("reply") or "").strip()
+    if status not in ("Solved", "Not Solved"):
+        return jsonify({"error": "status must be 'Solved' or 'Not Solved'."}), 400
+
+    change.status = status
+    change.admin_reply = reply
+    change.resolved_by = int(get_jwt_identity())
+    change.resolved_at = datetime.utcnow()
+
+    circular = Circular.query.get(change.circular_id)
+    num = circular.circular_number if circular else change.circular_id
+    db.session.add(Notification(
+        user_id=change.requester_id, circular_id=change.circular_id,
+        message=f"Your request on circular {num} was marked {status}"
+                + (f": {reply}" if reply else "."),
+    ))
+    db.session.commit()
+    audit.record("CHANGE_REQUEST_RESOLVED", user_id=int(get_jwt_identity()),
+                 entity_type="ChangeRequest", entity_id=change.id, detail=status)
+    return jsonify({"message": f"Request marked {status}."})
 
 
 @circulars_bp.post("/upload")
@@ -269,7 +445,9 @@ def summarize_circular(circular_id):
                  detail=f"{result.bart_model} in {result.processing_seconds}s")
 
     # FR-19/22/23: route to departments + notify recipients on publish.
-    dist = distribution.route_and_notify(circular)
+    # `broadcast=true` sends to every department regardless of classification.
+    broadcast = request.args.get("broadcast", "false").lower() == "true"
+    dist = distribution.route_and_notify(circular, broadcast=broadcast)
 
     # FR-40: rebuild the FAISS vector index so the new circular is searchable.
     try:
@@ -318,6 +496,24 @@ def override_classification(circular_id):
         "classifications": [c.to_dict() for c in circular.classifications],
         "distribution": dist,
     })
+
+
+@circulars_bp.post("/<int:circular_id>/broadcast")
+@jwt_required()
+@roles_required("Manager", "Administrator")
+def broadcast_circular(circular_id):
+    """Send an existing published circular to ALL departments (re-route)."""
+    circular = Circular.query.get(circular_id)
+    if not circular:
+        return jsonify({"error": "Circular not found."}), 404
+    if circular.status != "published":
+        return jsonify({"error": "Only published circulars can be broadcast."}), 400
+
+    dist = distribution.route_and_notify(circular, broadcast=True)
+    audit.record("CIRCULAR_BROADCAST", user_id=int(get_jwt_identity()),
+                 entity_type="Circular", entity_id=circular.id,
+                 detail=f"{dist['recipient_count']} recipients")
+    return jsonify({"distribution": dist})
 
 
 @circulars_bp.post("/reminders/run")

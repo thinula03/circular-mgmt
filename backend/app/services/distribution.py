@@ -24,9 +24,11 @@ CATEGORY_ROUTING = {
 RECIPIENT_ROLES = ("Employee", "Manager")
 
 
-def route_and_notify(circular):
+def route_and_notify(circular, broadcast=False):
     """Route a published circular to departments and notify recipients.
 
+    When `broadcast` is True the circular is sent to ALL departments, overriding
+    category-based routing (used by the "Send to all departments" toggle).
     Idempotent: re-running re-computes routing and tops up missing
     acknowledgements/notifications without duplicating them.
     Returns {"departments": [...], "recipient_count": n}.
@@ -35,14 +37,14 @@ def route_and_notify(circular):
 
     # ---- resolve target departments (FR-19) ----
     codes = set()
-    broadcast = False
+    broadcast_all = broadcast
     for cat in categories:
         mapped = CATEGORY_ROUTING.get(cat, [])
         if not mapped:
-            broadcast = True
+            broadcast_all = True  # "General" goes everywhere
         codes.update(mapped)
 
-    if broadcast or not codes:
+    if broadcast_all or not codes:
         departments = Department.query.all()
     else:
         departments = Department.query.filter(Department.code.in_(codes)).all()

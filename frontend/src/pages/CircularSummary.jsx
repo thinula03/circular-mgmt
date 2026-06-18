@@ -5,16 +5,21 @@ import EntityTags from "../components/EntityTags.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import ChatPanel from "../components/ChatPanel.jsx";
 import Icon from "../components/Icon.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 
 // WF-03 — Circular summary view with (Phase 6) embedded RAG chatbot.
 // Left: AI summary, NER tags, classifications, original PDF, Acknowledge.
 // Right: chat panel placeholder until Phase 6.
 export default function CircularSummary() {
   const { id } = useParams();
+  const { user } = useAuth();
+  const isStaff = user?.role === "Administrator" || user?.role === "Manager";
   const [circular, setCircular] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [acking, setAcking] = useState(false);
+  const [broadcasting, setBroadcasting] = useState(false);
+  const [broadcastMsg, setBroadcastMsg] = useState("");
 
   async function load() {
     setLoading(true);
@@ -40,6 +45,21 @@ export default function CircularSummary() {
       setCircular((c) => ({ ...c, my_status: res.data.status, my_ack: res.data }));
     } finally {
       setAcking(false);
+    }
+  }
+
+  async function broadcastAll() {
+    setBroadcasting(true);
+    setBroadcastMsg("");
+    try {
+      const res = await client.post(`/circulars/${id}/broadcast`);
+      const d = res.data.distribution;
+      setBroadcastMsg(`Sent to all departments — ${d.recipient_count} recipient${
+        d.recipient_count === 1 ? "" : "s"} notified.`);
+    } catch (err) {
+      setBroadcastMsg(err.response?.data?.error || "Broadcast failed.");
+    } finally {
+      setBroadcasting(false);
     }
   }
 
@@ -113,7 +133,17 @@ export default function CircularSummary() {
               </button>
             )}
             <button onClick={downloadPdf} className="btn-ghost">View original PDF</button>
+            {isStaff && (
+              <button onClick={broadcastAll} disabled={broadcasting} className="btn-ghost">
+                {broadcasting ? "Sending…" : "Send to all departments"}
+              </button>
+            )}
           </div>
+          {broadcastMsg && (
+            <div className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">
+              {broadcastMsg}
+            </div>
+          )}
         </section>
 
         {/* Right: RAG chatbot (FR-36–39) */}

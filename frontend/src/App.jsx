@@ -9,6 +9,7 @@ import CircularSummary from "./pages/CircularSummary.jsx";
 import ManagerDashboard from "./pages/ManagerDashboard.jsx";
 import AdminUpload from "./pages/AdminUpload.jsx";
 import Users from "./pages/Users.jsx";
+import Requests from "./pages/Requests.jsx";
 
 // Guard a route: require a session, and optionally a set of roles (RBAC, NFR-07).
 function Protected({ children, roles }) {
@@ -42,6 +43,15 @@ export default function App() {
           element={
             <Protected roles={["Manager", "Administrator"]}>
               <ManagerDashboard />
+            </Protected>
+          }
+        />
+        {/* Change requests — managers see theirs, admins resolve all */}
+        <Route
+          path="/requests"
+          element={
+            <Protected roles={["Manager", "Administrator"]}>
+              <Requests />
             </Protected>
           }
         />

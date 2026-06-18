@@ -53,6 +53,26 @@ class ChatLog(db.Model):
         }
 
 
+class ChangeRequest(db.Model):
+    """CHANGE_REQUESTS — managers flag a problem on a circular; admins resolve it.
+
+    status: Open (default) -> Solved / Not Solved (set by an administrator with a reply).
+    """
+    __tablename__ = "change_requests"
+
+    STATUSES = ("Open", "Solved", "Not Solved")
+
+    id = db.Column(db.Integer, primary_key=True)
+    circular_id = db.Column(db.Integer, db.ForeignKey("circulars.id"), nullable=False)
+    requester_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(20), nullable=False, default="Open")
+    admin_reply = db.Column(db.Text)
+    resolved_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    resolved_at = db.Column(db.DateTime)
+
+
 class VectorIndexMetadata(db.Model):
     """VECTOR_INDEX_METADATA — FAISS index state and rebuild history (FR-40)."""
     __tablename__ = "vector_index_metadata"
