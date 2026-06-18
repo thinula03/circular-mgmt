@@ -399,19 +399,23 @@ def summarize_circular(circular_id):
     if not (circular.extracted_text or "").strip():
         return jsonify({"error": "Circular has no extracted text to summarize."}), 400
 
-    target_words = int(request.args.get("target_words", 200))
-    target_words = max(80, min(target_words, 300))  # FR-14 configurable, bounded
+    # 1-page rule: condense to ~page_words (default 500). Optional override.
+    page_words = request.args.get("page_words")
+    page_words = int(page_words) if page_words else None
+    # regenerate=true: refresh the summary only — keep the deadline, don't re-notify.
+    regenerate = request.args.get("regenerate", "false").lower() == "true"
 
-    # FR-25: acknowledgement deadline (days from now, default 7).
-    ack_days = int(request.args.get("ack_days", 7))
-    circular.ack_deadline = datetime.utcnow() + timedelta(days=max(1, ack_days))
+    if not regenerate:
+        # FR-25: acknowledgement deadline (days from now, default 7).
+        ack_days = int(request.args.get("ack_days", 7))
+        circular.ack_deadline = datetime.utcnow() + timedelta(days=max(1, ack_days))
 
     circular.status = "processing"  # FR-17 status the UI can show
     db.session.commit()
 
     engine = get_engine(current_app.config)
     try:
-        result = engine.summarize(circular.extracted_text, target_words=target_words)
+        result = engine.summarize(circular.extracted_text, page_words=page_words)
     except Exception as exc:  # noqa: BLE001 — surface failure, mark circular failed
         circular.status = "failed"
         db.session.commit()
@@ -432,30 +436,31 @@ def summarize_circular(circular_id):
     )
     db.session.add(summary)
 
-    # Auto-classification (FR-18) — refresh on each run.
+    # Auto-classification (FR-18) — refresh AI categories (keep manual overrides).
     Classification.query.filter_by(circular_id=circular.id, is_manual=False).delete()
     for c in engine.classify(circular.extracted_text):
         db.session.add(Classification(circular_id=circular.id, **c))
 
     circular.status = "published"
-    circular.published_at = datetime.utcnow()
+    circular.published_at = circular.published_at or datetime.utcnow()
     db.session.commit()
-    audit.record("CIRCULAR_SUMMARIZED", user_id=int(get_jwt_identity()),
-                 entity_type="Circular", entity_id=circular.id,
+    audit.record("CIRCULAR_RESUMMARIZED" if regenerate else "CIRCULAR_SUMMARIZED",
+                 user_id=int(get_jwt_identity()), entity_type="Circular",
+                 entity_id=circular.id,
                  detail=f"{result.bart_model} in {result.processing_seconds}s")
 
-    # FR-19/22/23: route to departments + notify recipients on publish.
-    # `broadcast=true` sends to every department regardless of classification.
-    broadcast = request.args.get("broadcast", "false").lower() == "true"
-    dist = distribution.route_and_notify(circular, broadcast=broadcast)
-
-    # FR-40: rebuild the FAISS vector index so the new circular is searchable.
-    try:
-        get_index(current_app.config).build(
-            Circular.query.filter_by(status="published").all()
-        )
-    except Exception:  # noqa: BLE001 — indexing failure shouldn't fail publishing
-        pass
+    # On a fresh publish, route + notify + index. On regenerate, skip both
+    # (recipients already notified; the index is built from the unchanged text).
+    dist = None
+    if not regenerate:
+        broadcast = request.args.get("broadcast", "false").lower() == "true"
+        dist = distribution.route_and_notify(circular, broadcast=broadcast)
+        try:
+            get_index(current_app.config).build(
+                Circular.query.filter_by(status="published").all()
+            )
+        except Exception:  # noqa: BLE001 — indexing failure shouldn't fail publishing
+            pass
 
     return jsonify({
         "circular": circular.to_dict(),

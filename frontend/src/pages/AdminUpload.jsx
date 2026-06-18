@@ -32,7 +32,7 @@ export default function AdminUpload() {
     setSummarizing(true);
     try {
       const res = await client.post(
-        `/circulars/${result.circular.id}/summarize?target_words=150&ack_days=${ackDays}&broadcast=${broadcast}`,
+        `/circulars/${result.circular.id}/summarize?ack_days=${ackDays}&broadcast=${broadcast}`,
         {},
         { timeout: 240000 } // first run loads BART (~1–2 min on CPU)
       );

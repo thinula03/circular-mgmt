@@ -23,6 +23,16 @@ _HUB_CACHE = os.path.join(_BACKEND_ROOT, "model_cache", "hub")
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
+# ---- summary length policy (1-page rule) ----------------------------------
+# Every circular is condensed to roughly one page (~500 words), regardless of
+# how long it is, via budget-allocated map-reduce. A single BART pass only emits
+# ~200 words, so long documents are chunked, each chunk gets a slice of the page
+# budget, and the parts are combined (and reduced again if still too long).
+PAGE_WORDS = 500        # target ~1 page
+CHUNK_WORDS = 700       # source chunk size (fits BART's ~1024-token input)
+PER_CHUNK_CAP = 200     # max words BART produces coherently in one pass
+REDUCE_SLACK = 1.3      # if combined > PAGE_WORDS * slack, summarise again
+
 # spaCy entity labels we surface as tags (FR-15).
 _KEEP_LABELS = {"DATE", "MONEY", "PERCENT", "ORG", "GPE", "LAW", "CARDINAL"}
 # Map spaCy labels to the friendlier tags used in the UI.
@@ -105,12 +115,18 @@ class AIEngine(NLPPipeline):
         return self._bart
 
     # ---- public API ----------------------------------------------------
-    def summarize(self, text: str, target_words: int = 200) -> SummaryResult:
+    def summarize(self, text: str, page_words: int = None) -> SummaryResult:
+        """Condense a circular to ~1 page (page_words, default PAGE_WORDS).
+
+        spaCy NER (FR-11) runs on the whole document; the body is summarised to
+        the page target via map-reduce (FR-12/13) so even long circulars are
+        covered in full rather than truncated.
+        """
         start = time.perf_counter()
         text = _clean_text(text)
+        page_target = int(page_words or PAGE_WORDS)
         entities = self.extract_entities(text)
-        selected = self._extractive_select(text, target_words)
-        summary = self._abstractive(selected, target_words)
+        summary = self._summarize_to_page(text, page_target)
         elapsed = round(time.perf_counter() - start, 2)
         return SummaryResult(
             summary_text=summary,
@@ -120,6 +136,31 @@ class AIEngine(NLPPipeline):
             bart_model=self._bart_used or self.bart_model_name,
             processing_seconds=elapsed,
         )
+
+    def _summarize_to_page(self, text: str, page_target: int) -> str:
+        """Recursively summarise `text` down to ~page_target words.
+
+        Short text (≤ one chunk) → single spaCy→BERT→BART pass.
+        Long text → split into chunks, give each a slice of the page budget,
+        summarise (BART), combine; if still too long, reduce again.
+        """
+        words = text.split()
+        n = len(words)
+
+        if n <= CHUNK_WORDS:
+            aim = max(1, min(PER_CHUNK_CAP, page_target, n))
+            selected = self._extractive_select(text, aim)   # FR-12 BERT stage
+            return self._abstractive(selected, aim)         # FR-13 BART stage
+
+        chunks = [" ".join(words[i:i + CHUNK_WORDS]) for i in range(0, n, CHUNK_WORDS)]
+        per = max(50, min(PER_CHUNK_CAP, round(page_target / len(chunks))))
+        parts = [self._abstractive(c, per) for c in chunks]
+        combined = "\n\n".join(p for p in parts if p.strip())
+
+        # Converged to ~1 page? return; otherwise reduce the combined text again.
+        if len(combined.split()) <= page_target * REDUCE_SLACK:
+            return combined
+        return self._summarize_to_page(combined, page_target)
 
     def answer_with_context(self, question: str, context: str,
                             target_words: int = 120) -> str:

@@ -13,13 +13,15 @@ import { useAuth } from "../context/AuthContext.jsx";
 export default function CircularSummary() {
   const { id } = useParams();
   const { user } = useAuth();
-  const isStaff = user?.role === "Administrator" || user?.role === "Manager";
+  const isAdmin = user?.role === "Administrator";
+  const isStaff = isAdmin || user?.role === "Manager";
   const [circular, setCircular] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [acking, setAcking] = useState(false);
   const [broadcasting, setBroadcasting] = useState(false);
   const [broadcastMsg, setBroadcastMsg] = useState("");
+  const [regenerating, setRegenerating] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -60,6 +62,20 @@ export default function CircularSummary() {
       setBroadcastMsg(err.response?.data?.error || "Broadcast failed.");
     } finally {
       setBroadcasting(false);
+    }
+  }
+
+  async function regenerate() {
+    setRegenerating(true);
+    setBroadcastMsg("");
+    try {
+      await client.post(`/circulars/${id}/summarize?regenerate=true`, {}, { timeout: 300000 });
+      await load();
+      setBroadcastMsg("Summary re-generated.");
+    } catch (err) {
+      setBroadcastMsg(err.response?.data?.error || "Re-generate failed.");
+    } finally {
+      setRegenerating(false);
     }
   }
 
@@ -136,6 +152,20 @@ export default function CircularSummary() {
             {isStaff && (
               <button onClick={broadcastAll} disabled={broadcasting} className="btn-ghost">
                 {broadcasting ? "Sending…" : "Send to all departments"}
+              </button>
+            )}
+            {isAdmin && (
+              <button onClick={regenerate} disabled={regenerating} className="btn-ghost">
+                {regenerating ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-brand-400 border-t-transparent" />
+                    Re-generating…
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Icon name="sparkles" className="h-4 w-4" /> Re-generate summary
+                  </span>
+                )}
               </button>
             )}
           </div>
