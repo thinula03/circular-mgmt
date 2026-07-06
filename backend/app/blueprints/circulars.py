@@ -240,7 +240,8 @@ def request_change(circular_id):
             f"{circular.circular_number}: {message}")
     admins = User.query.filter_by(role="Administrator", is_active=True).all()
     for admin in admins:
-        db.session.add(Notification(user_id=admin.id, circular_id=circular.id, message=note))
+        db.session.add(Notification(user_id=admin.id, circular_id=circular.id, message=note,
+                                    link="/requests"))
     db.session.commit()
     audit.record("CIRCULAR_CHANGE_REQUESTED", user_id=requester.id,
                  entity_type="Circular", entity_id=circular.id, detail=message[:200])
@@ -306,6 +307,7 @@ def resolve_request(req_id):
         user_id=change.requester_id, circular_id=change.circular_id,
         message=f"Your request on circular {num} was marked {status}"
                 + (f": {reply}" if reply else "."),
+        link="/requests",
     ))
     db.session.commit()
     audit.record("CHANGE_REQUEST_RESOLVED", user_id=int(get_jwt_identity()),

@@ -49,6 +49,9 @@ class Notification(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     circular_id = db.Column(db.Integer, db.ForeignKey("circulars.id"))
     message = db.Column(db.String(512), nullable=False)
+    # In-app destination for this notification (e.g. "/requests" or
+    # "/circulars/5"). Drives click-through navigation in the notification bell.
+    link = db.Column(db.String(255))
     is_read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -58,6 +61,7 @@ class Notification(db.Model):
             "user_id": self.user_id,
             "circular_id": self.circular_id,
             "message": self.message,
+            "link": self.link,
             "is_read": self.is_read,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

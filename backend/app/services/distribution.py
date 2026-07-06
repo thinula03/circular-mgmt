@@ -76,7 +76,8 @@ def route_and_notify(circular, broadcast=False):
         # In-app notification (FR-22)
         msg = (f"[{circular.priority}] New circular {circular.circular_number}: "
                f"{circular.title} — acknowledge by {deadline_txt}.")
-        db.session.add(Notification(user_id=user.id, circular_id=circular.id, message=msg))
+        db.session.add(Notification(user_id=user.id, circular_id=circular.id, message=msg,
+                                    link=f"/circulars/{circular.id}"))
 
         # Email notification with the summary (FR-23)
         summary_text = circular.summary.summary_text if circular.summary else ""
@@ -132,6 +133,7 @@ def run_reminders(window_hours: int = 24):
             user_id=user.id, circular_id=circular.id,
             message=(f"Reminder: please acknowledge circular "
                      f"{circular.circular_number} — {circular.title}."),
+            link=f"/circulars/{circular.id}",
         ))
         email.send_email(
             to=user.email,

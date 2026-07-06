@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import client from "../api/client";
+import { useAuth } from "../context/AuthContext.jsx";
 import Icon from "./Icon.jsx";
 
 // FR-22: in-app notification indicator with unread count + dropdown list.
@@ -7,6 +9,38 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState({ unread: 0, items: [] });
   const ref = useRef(null);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const isStaff = user?.role === "Manager" || user?.role === "Administrator";
+
+  // Where a notification points. Prefer the server-provided link; fall back to
+  // the related circular for older rows created before the link column existed.
+  // The Requests page is staff-only, so guard that destination.
+  function targetFor(n) {
+    if (n.link) {
+      if (n.link === "/requests" && !isStaff) return null;
+      return n.link;
+    }
+    if (n.circular_id) return `/circulars/${n.circular_id}`;
+    return null;
+  }
+
+  async function openNotification(n) {
+    setOpen(false);
+    if (!n.is_read) {
+      try {
+        await client.post(`/notifications/${n.id}/read`);
+        setData((d) => ({
+          unread: Math.max(0, d.unread - 1),
+          items: d.items.map((i) => (i.id === n.id ? { ...i, is_read: true } : i)),
+        }));
+      } catch {
+        /* ignore — still navigate */
+      }
+    }
+    const to = targetFor(n);
+    if (to) navigate(to);
+  }
 
   async function load() {
     try {
@@ -66,19 +100,25 @@ export default function NotificationBell() {
             {data.items.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-ink-muted">No notifications.</p>
             ) : (
-              data.items.map((n) => (
-                <div
-                  key={n.id}
-                  className={`border-b border-ink-line px-4 py-3 text-sm ${
-                    n.is_read ? "text-ink-muted" : "bg-brand-50/40 text-ink"
-                  }`}
-                >
-                  <div>{n.message}</div>
-                  <div className="mt-1 text-[11px] text-ink-muted">
-                    {n.created_at ? new Date(n.created_at).toLocaleString() : ""}
-                  </div>
-                </div>
-              ))
+              data.items.map((n) => {
+                const clickable = targetFor(n) !== null;
+                return (
+                  <button
+                    key={n.id}
+                    type="button"
+                    onClick={() => openNotification(n)}
+                    disabled={!clickable}
+                    className={`block w-full border-b border-ink-line px-4 py-3 text-left text-sm ${
+                      n.is_read ? "text-ink-muted" : "bg-brand-50/40 text-ink"
+                    } ${clickable ? "cursor-pointer hover:bg-ink-surface" : "cursor-default"}`}
+                  >
+                    <div>{n.message}</div>
+                    <div className="mt-1 text-[11px] text-ink-muted">
+                      {n.created_at ? new Date(n.created_at).toLocaleString() : ""}
+                    </div>
+                  </button>
+                );
+              })
             )}
           </div>
         </div>
