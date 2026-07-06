@@ -34,7 +34,7 @@ export default function AdminUpload() {
       const res = await client.post(
         `/circulars/${result.circular.id}/summarize?ack_days=${ackDays}&broadcast=${broadcast}`,
         {},
-        { timeout: 240000 } // first run loads BART (~1–2 min on CPU)
+        { timeout: 600000 } // 1-page map-reduce on CPU can take several minutes
       );
       setSummary(res.data.summary);
       setClassifications(res.data.classifications || []);

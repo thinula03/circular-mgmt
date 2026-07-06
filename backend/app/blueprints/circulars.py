@@ -126,6 +126,19 @@ def download_circular(circular_id):
                      as_attachment=True, download_name=download_name)
 
 
+@circulars_bp.get("/<int:circular_id>/preview")
+@jwt_required()
+def preview_circular(circular_id):
+    """FR-30: stream the original PDF inline for in-browser preview (no download)."""
+    circular = Circular.query.get(circular_id)
+    if not circular or not circular.file_path or not os.path.exists(circular.file_path):
+        return jsonify({"error": "Original PDF not available."}), 404
+    audit.record("CIRCULAR_PREVIEWED", user_id=int(get_jwt_identity()),
+                 entity_type="Circular", entity_id=circular.id)
+    return send_file(circular.file_path, mimetype="application/pdf",
+                     as_attachment=False)
+
+
 @circulars_bp.patch("/<int:circular_id>")
 @jwt_required()
 @roles_required("Administrator")

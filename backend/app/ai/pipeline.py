@@ -28,10 +28,12 @@ os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 # how long it is, via budget-allocated map-reduce. A single BART pass only emits
 # ~200 words, so long documents are chunked, each chunk gets a slice of the page
 # budget, and the parts are combined (and reduced again if still too long).
-PAGE_WORDS = 500        # target ~1 page
+PAGE_WORDS = 500        # ~1 page target (minimum ~500 words, any document length)
 CHUNK_WORDS = 700       # source chunk size (fits BART's ~1024-token input)
-PER_CHUNK_CAP = 200     # max words BART produces coherently in one pass
-REDUCE_SLACK = 1.3      # if combined > PAGE_WORDS * slack, summarise again
+PER_CHUNK_CAP = 250     # max words from one BART pass
+PER_CHUNK_FLOOR = 60    # keep each chunk summary readable
+STOP_FACTOR = 1.4       # accept the result once it is within 1.4x the page target
+MAX_DEPTH = 4           # recursion guard
 
 # spaCy entity labels we surface as tags (FR-15).
 _KEEP_LABELS = {"DATE", "MONEY", "PERCENT", "ORG", "GPE", "LAW", "CARDINAL"}
@@ -137,30 +139,35 @@ class AIEngine(NLPPipeline):
             processing_seconds=elapsed,
         )
 
-    def _summarize_to_page(self, text: str, page_target: int) -> str:
-        """Recursively summarise `text` down to ~page_target words.
+    def _summarize_to_page(self, text: str, page_target: int, depth: int = 0) -> str:
+        """Summarise `text` to ~page_target words (minimum ~page_target).
 
         Short text (≤ one chunk) → single spaCy→BERT→BART pass.
-        Long text → split into chunks, give each a slice of the page budget,
-        summarise (BART), combine; if still too long, reduce again.
+        Long text → split into EVEN chunks, force each to fill its share of the
+        page budget (tight), combine; if the combined text is still well over a
+        page, condense it once more toward the page target (recurse).
         """
         words = text.split()
         n = len(words)
 
         if n <= CHUNK_WORDS:
             aim = max(1, min(PER_CHUNK_CAP, page_target, n))
-            selected = self._extractive_select(text, aim)   # FR-12 BERT stage
-            return self._abstractive(selected, aim)         # FR-13 BART stage
+            selected = self._extractive_select(text, aim)            # FR-12 BERT
+            return self._abstractive(selected, aim, tight=True)      # FR-13 BART
 
-        chunks = [" ".join(words[i:i + CHUNK_WORDS]) for i in range(0, n, CHUNK_WORDS)]
-        per = max(50, min(PER_CHUNK_CAP, round(page_target / len(chunks))))
-        parts = [self._abstractive(c, per) for c in chunks]
+        # Even chunks (no tiny leftover); each gets a share of the page budget.
+        num_chunks = -(-n // CHUNK_WORDS)                 # ceil(n / CHUNK_WORDS)
+        size = -(-n // num_chunks)                        # balanced chunk size
+        per = max(PER_CHUNK_FLOOR, min(PER_CHUNK_CAP, -(-page_target // num_chunks)))
+        chunks = [" ".join(words[i:i + size]) for i in range(0, n, size)]
+        parts = [self._abstractive(c, per, tight=True) for c in chunks]
         combined = "\n\n".join(p for p in parts if p.strip())
 
-        # Converged to ~1 page? return; otherwise reduce the combined text again.
-        if len(combined.split()) <= page_target * REDUCE_SLACK:
+        # Within ~1 page already, or out of recursion budget → return it.
+        if len(combined.split()) <= page_target * STOP_FACTOR or depth >= MAX_DEPTH:
             return combined
-        return self._summarize_to_page(combined, page_target)
+        # Still much longer than a page → condense the combined text again.
+        return self._summarize_to_page(combined, page_target, depth + 1)
 
     def answer_with_context(self, question: str, context: str,
                             target_words: int = 120) -> str:
@@ -250,15 +257,27 @@ class AIEngine(NLPPipeline):
         return " ".join(candidates[i] for i in top_idx)
 
     # ---- stage 3: abstractive summary via BART (FR-13/14) -------------
-    def _abstractive(self, text: str, target_words: int) -> str:
+    def _abstractive(self, text: str, target_words: int, tight: bool = False) -> str:
+        """Summarise `text` to ~target_words (words; BART counts tokens ≈1.3x).
+
+        BART tends to stop near its *minimum* length, so the page-budget map step
+        uses tight=True to raise the floor (min_len ≈ target) and actually fill
+        each chunk's share. Chat/short paths keep the looser bounds. The target is
+        capped to the source length so a small chunk is never padded.
+        """
         summarizer = self._load_bart()
-        # token budget ~ 1.4 tokens/word; clamp to the model's comfortable range.
-        max_len = min(300, max(80, int(target_words * 1.4)))
-        min_len = min(max_len - 20, max(40, int(target_words * 0.6)))
+        src_words = max(1, len(text.split()))
+        if tight:
+            aim = min(target_words, max(20, int(src_words * 0.9)))  # never pad
+            max_len = min(450, int(aim * 1.8))
+            min_len = min(max_len - 10, int(aim * 1.3))
+        else:
+            max_len = min(300, max(80, int(target_words * 1.4)))
+            min_len = min(max_len - 20, max(40, int(target_words * 0.6)))
         result = summarizer(
             text,
             max_length=max_len,
-            min_length=min_len,
+            min_length=max(20, min_len),
             do_sample=False,
             truncation=True,
         )

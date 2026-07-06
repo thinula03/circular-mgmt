@@ -22,6 +22,9 @@ export default function CircularSummary() {
   const [broadcasting, setBroadcasting] = useState(false);
   const [broadcastMsg, setBroadcastMsg] = useState("");
   const [regenerating, setRegenerating] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
 
   async function load() {
     setLoading(true);
@@ -69,7 +72,7 @@ export default function CircularSummary() {
     setRegenerating(true);
     setBroadcastMsg("");
     try {
-      await client.post(`/circulars/${id}/summarize?regenerate=true`, {}, { timeout: 300000 });
+      await client.post(`/circulars/${id}/summarize?regenerate=true`, {}, { timeout: 600000 });
       await load();
       setBroadcastMsg("Summary re-generated.");
     } catch (err) {
@@ -78,6 +81,33 @@ export default function CircularSummary() {
       setRegenerating(false);
     }
   }
+
+  async function openPreview() {
+    setPreviewLoading(true);
+    setPreviewError("");
+    try {
+      const res = await client.get(`/circulars/${id}/preview`, { responseType: "blob" });
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      setPreviewUrl(URL.createObjectURL(blob));
+    } catch (err) {
+      setPreviewError(err.response?.data?.error || "Could not load the PDF preview.");
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  function closePreview() {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl("");
+    setPreviewError("");
+  }
+
+  // Revoke any outstanding object URL when leaving the page.
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   async function downloadPdf() {
     // Authenticated download: fetch as a blob, then save.
@@ -148,7 +178,16 @@ export default function CircularSummary() {
                 )}
               </button>
             )}
-            <button onClick={downloadPdf} className="btn-ghost">View original PDF</button>
+            <button onClick={openPreview} disabled={previewLoading} className="btn-ghost">
+              {previewLoading ? (
+                "Loading…"
+              ) : (
+                <span className="flex items-center gap-2">
+                  <Icon name="eye" className="h-4 w-4" /> Preview
+                </span>
+              )}
+            </button>
+            <button onClick={downloadPdf} className="btn-ghost">Download PDF</button>
             {isStaff && (
               <button onClick={broadcastAll} disabled={broadcasting} className="btn-ghost">
                 {broadcasting ? "Sending…" : "Send to all departments"}
@@ -169,6 +208,11 @@ export default function CircularSummary() {
               </button>
             )}
           </div>
+          {previewError && (
+            <div className="rounded-lg bg-status-unread/10 px-3 py-2 text-sm text-status-unread">
+              {previewError}
+            </div>
+          )}
           {broadcastMsg && (
             <div className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">
               {broadcastMsg}
@@ -181,6 +225,31 @@ export default function CircularSummary() {
           <ChatPanel />
         </div>
       </div>
+
+      {/* Inline PDF preview modal */}
+      {previewUrl && (
+        <div
+          className="fixed inset-0 z-30 grid place-items-center bg-black/40 p-4"
+          onClick={closePreview}
+        >
+          <div
+            className="card flex h-[90vh] w-full max-w-4xl flex-col p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-ink">
+                {circular.circular_number} — {circular.title}
+              </h2>
+              <button onClick={closePreview} className="btn-ghost py-1.5 text-xs">Close</button>
+            </div>
+            <iframe
+              src={previewUrl}
+              title="Circular PDF preview"
+              className="min-h-0 flex-1 rounded-lg border border-ink-line"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
