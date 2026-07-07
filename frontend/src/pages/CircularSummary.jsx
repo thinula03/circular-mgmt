@@ -22,6 +22,7 @@ export default function CircularSummary() {
   const [broadcasting, setBroadcasting] = useState(false);
   const [broadcastMsg, setBroadcastMsg] = useState("");
   const [regenerating, setRegenerating] = useState(false);
+  const [publishingReview, setPublishingReview] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
@@ -65,6 +66,22 @@ export default function CircularSummary() {
       setBroadcastMsg(err.response?.data?.error || "Broadcast failed.");
     } finally {
       setBroadcasting(false);
+    }
+  }
+
+  async function publishReview() {
+    setPublishingReview(true);
+    setBroadcastMsg("");
+    try {
+      const res = await client.post(`/circulars/${id}/publish`);
+      await load();
+      const d = res.data.distribution;
+      setBroadcastMsg(`Published — routed to ${d.departments.join(", ")}, ${
+        d.recipient_count} recipient${d.recipient_count === 1 ? "" : "s"} notified.`);
+    } catch (err) {
+      setBroadcastMsg(err.response?.data?.error || "Publish failed.");
+    } finally {
+      setPublishingReview(false);
     }
   }
 
@@ -135,6 +152,22 @@ export default function CircularSummary() {
         </div>
         <Link to="/" className="btn-ghost py-1.5 text-xs">← Back to list</Link>
       </div>
+
+      {/* Review banner: unpublished circular awaiting admin publish */}
+      {isAdmin && circular.status !== "published" && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
+          <span className="text-ink">
+            <span className="font-semibold text-status-read">Not published.</span>{" "}
+            {summary ? "Review the summary below, then publish to distribute."
+                     : "Generate a summary from the upload screen, then publish."}
+          </span>
+          {summary && (
+            <button onClick={publishReview} disabled={publishingReview} className="btn-primary py-1.5 text-xs">
+              {publishingReview ? "Publishing…" : "Publish & distribute"}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Amendment banners */}
       {circular.amends && (

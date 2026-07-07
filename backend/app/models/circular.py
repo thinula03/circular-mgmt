@@ -7,7 +7,7 @@ class Circular(db.Model):
     """CIRCULARS — PDF metadata, extracted text, lifecycle status."""
     __tablename__ = "circulars"
 
-    STATUSES = ("uploaded", "processing", "published", "failed")
+    STATUSES = ("uploaded", "processing", "review", "published", "failed")
     PRIORITIES = ("High", "Medium", "Low")
 
     id = db.Column(db.Integer, primary_key=True)

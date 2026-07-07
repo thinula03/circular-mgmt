@@ -426,8 +426,11 @@ def upload_circular():
 def summarize_circular(circular_id):
     """FR-11–FR-16: run the spaCy->BERT->BART pipeline on a stored circular.
 
-    Generates the abstractive summary + NER entities, auto-classifies the
-    compliance category (FR-18), and publishes the circular.
+    Generates the abstractive summary + NER entities and auto-classifies the
+    compliance category (FR-18). This does NOT distribute — the circular moves to
+    'review' so an administrator can check the summary before publishing. Use the
+    /publish endpoint to distribute. (regenerate=true refreshes an already-
+    published summary in place without changing status or re-notifying.)
     """
     circular = Circular.query.get(circular_id)
     if not circular:
@@ -438,14 +441,10 @@ def summarize_circular(circular_id):
     # 1-page rule: condense to ~page_words (default 500). Optional override.
     page_words = request.args.get("page_words")
     page_words = int(page_words) if page_words else None
-    # regenerate=true: refresh the summary only — keep the deadline, don't re-notify.
+    # regenerate=true: refresh the summary of an already-published circular only.
     regenerate = request.args.get("regenerate", "false").lower() == "true"
 
-    if not regenerate:
-        # FR-25: acknowledgement deadline (days from now, default 7).
-        ack_days = int(request.args.get("ack_days", 7))
-        circular.ack_deadline = datetime.utcnow() + timedelta(days=max(1, ack_days))
-
+    prev_status = circular.status
     circular.status = "processing"  # FR-17 status the UI can show
     db.session.commit()
 
@@ -477,31 +476,65 @@ def summarize_circular(circular_id):
     for c in engine.classify(circular.extracted_text):
         db.session.add(Classification(circular_id=circular.id, **c))
 
-    circular.status = "published"
-    circular.published_at = circular.published_at or datetime.utcnow()
+    # Regenerate keeps the (published) status; a fresh summary goes to review.
+    circular.status = prev_status if regenerate else "review"
     db.session.commit()
     audit.record("CIRCULAR_RESUMMARIZED" if regenerate else "CIRCULAR_SUMMARIZED",
                  user_id=int(get_jwt_identity()), entity_type="Circular",
                  entity_id=circular.id,
                  detail=f"{result.bart_model} in {result.processing_seconds}s")
 
-    # On a fresh publish, route + notify + index. On regenerate, skip both
-    # (recipients already notified; the index is built from the unchanged text).
-    dist = None
-    if not regenerate:
-        broadcast = request.args.get("broadcast", "false").lower() == "true"
-        dist = distribution.route_and_notify(circular, broadcast=broadcast)
+    # Regenerate rebuilds the index in place (text unchanged but summary refreshed).
+    if regenerate:
         try:
             get_index(current_app.config).build(
-                Circular.query.filter_by(status="published").all()
-            )
-        except Exception:  # noqa: BLE001 — indexing failure shouldn't fail publishing
+                Circular.query.filter_by(status="published").all())
+        except Exception:  # noqa: BLE001
             pass
 
     return jsonify({
         "circular": circular.to_dict(),
         "summary": summary.to_dict(),
         "classifications": [c.to_dict() for c in circular.classifications],
+    })
+
+
+@circulars_bp.post("/<int:circular_id>/publish")
+@jwt_required()
+@roles_required("Administrator")
+def publish_circular(circular_id):
+    """Publish a reviewed circular: set the deadline, distribute + notify, index.
+
+    Separated from /summarize so an administrator can review the AI summary first.
+    """
+    circular = Circular.query.get(circular_id)
+    if not circular:
+        return jsonify({"error": "Circular not found."}), 404
+    if not circular.summary:
+        return jsonify({"error": "Generate a summary before publishing."}), 400
+    if circular.status == "published":
+        return jsonify({"error": "This circular is already published."}), 400
+
+    # FR-25: acknowledgement deadline (days from now, default 7).
+    ack_days = int(request.args.get("ack_days", 7))
+    broadcast = request.args.get("broadcast", "false").lower() == "true"
+    circular.ack_deadline = datetime.utcnow() + timedelta(days=max(1, ack_days))
+    circular.status = "published"
+    circular.published_at = circular.published_at or datetime.utcnow()
+    db.session.commit()
+
+    dist = distribution.route_and_notify(circular, broadcast=broadcast)
+    try:
+        get_index(current_app.config).build(
+            Circular.query.filter_by(status="published").all())
+    except Exception:  # noqa: BLE001 — indexing failure shouldn't fail publishing
+        pass
+
+    audit.record("CIRCULAR_PUBLISHED", user_id=int(get_jwt_identity()),
+                 entity_type="Circular", entity_id=circular.id,
+                 detail=f"{dist['recipient_count']} recipients")
+    return jsonify({
+        "circular": circular.to_dict(),
         "distribution": dist,
     })
 

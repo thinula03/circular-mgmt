@@ -33,23 +33,40 @@ export default function AdminUpload() {
   const [ackDays, setAckDays] = useState(7);
   const [broadcast, setBroadcast] = useState(false);
   const [sumError, setSumError] = useState("");
+  const [publishing, setPublishing] = useState(false);
 
   async function handleSummarize() {
     setSumError("");
     setSummarizing(true);
     try {
       const res = await client.post(
-        `/circulars/${result.circular.id}/summarize?ack_days=${ackDays}&broadcast=${broadcast}`,
+        `/circulars/${result.circular.id}/summarize`,
         {},
         { timeout: 600000 } // 1-page map-reduce on CPU can take several minutes
       );
       setSummary(res.data.summary);
       setClassifications(res.data.classifications || []);
-      setDistribution(res.data.distribution || null);
     } catch (err) {
       setSumError(err.response?.data?.error || "Summarization failed.");
     } finally {
       setSummarizing(false);
+    }
+  }
+
+  async function handlePublish() {
+    setSumError("");
+    setPublishing(true);
+    try {
+      const res = await client.post(
+        `/circulars/${result.circular.id}/publish?ack_days=${ackDays}&broadcast=${broadcast}`,
+        {},
+        { timeout: 120000 }
+      );
+      setDistribution(res.data.distribution || null);
+    } catch (err) {
+      setSumError(err.response?.data?.error || "Publish failed.");
+    } finally {
+      setPublishing(false);
     }
   }
 
@@ -137,48 +154,20 @@ export default function AdminUpload() {
             </pre>
           </div>
 
-          {/* AI summarization (FR-11–17) */}
+          {/* AI summarization (FR-11–17) — generate, review, then publish */}
           <div className="border-t border-ink-line pt-4">
             {!summary ? (
               <div className="space-y-3">
-                <div className="flex flex-wrap items-end gap-4">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium uppercase text-ink-muted">
-                      Acknowledge within (days)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="90"
-                      value={ackDays}
-                      onChange={(e) => setAckDays(Number(e.target.value) || 7)}
-                      className="input w-28"
-                    />
-                  </div>
-                  <label className="flex cursor-pointer items-center gap-2 pb-2 text-sm text-ink">
-                    <input
-                      type="checkbox"
-                      checked={broadcast}
-                      onChange={(e) => setBroadcast(e.target.checked)}
-                      className="h-4 w-4 rounded border-ink-line text-brand-500 focus:ring-brand-400"
-                    />
-                    Send to all departments
-                  </label>
-                </div>
-                <button
-                  onClick={handleSummarize}
-                  disabled={summarizing}
-                  className="btn-primary"
-                >
+                <button onClick={handleSummarize} disabled={summarizing} className="btn-primary">
                   {summarizing ? (
                     <span className="flex items-center gap-2">
                       <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      Summarizing & distributing…
+                      Summarizing…
                     </span>
                   ) : (
                     <span className="flex items-center gap-2">
                       <Icon name="sparkles" className="h-4 w-4" />
-                      Generate summary & publish
+                      Generate summary
                     </span>
                   )}
                 </button>
@@ -197,6 +186,9 @@ export default function AdminUpload() {
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold text-ink">AI Summary</span>
+                  {!distribution && (
+                    <span className="badge bg-amber-50 text-status-read">Draft — review before publishing</span>
+                  )}
                   {classifications.map((c) => (
                     <span key={c.id || c.category} className="badge bg-brand-50 text-brand-700">
                       {c.category}
@@ -216,7 +208,49 @@ export default function AdminUpload() {
                   <EntityTags entities={summary.entities} />
                 </div>
 
-                {distribution && (
+                {/* Review step: choose settings, regenerate, or publish */}
+                {!distribution ? (
+                  <div className="space-y-3 border-t border-ink-line pt-3">
+                    <div className="flex flex-wrap items-end gap-4">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium uppercase text-ink-muted">
+                          Acknowledge within (days)
+                        </label>
+                        <input type="number" min="1" max="90" value={ackDays}
+                          onChange={(e) => setAckDays(Number(e.target.value) || 7)}
+                          className="input w-28" />
+                      </div>
+                      <label className="flex cursor-pointer items-center gap-2 pb-2 text-sm text-ink">
+                        <input type="checkbox" checked={broadcast}
+                          onChange={(e) => setBroadcast(e.target.checked)}
+                          className="h-4 w-4 rounded border-ink-line text-brand-500 focus:ring-brand-400" />
+                        Send to all departments
+                      </label>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button onClick={handlePublish} disabled={publishing} className="btn-primary">
+                        {publishing ? (
+                          <span className="flex items-center gap-2">
+                            <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                            Publishing…
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-2">
+                            <Icon name="check" className="h-4 w-4" /> Publish &amp; distribute
+                          </span>
+                        )}
+                      </button>
+                      <button onClick={handleSummarize} disabled={summarizing} className="btn-ghost">
+                        {summarizing ? "Regenerating…" : "Regenerate summary"}
+                      </button>
+                    </div>
+                    {sumError && (
+                      <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-status-unread">
+                        {sumError}
+                      </div>
+                    )}
+                  </div>
+                ) : (
                   <div className="rounded-lg border border-ink-line bg-ink-surface p-3 text-sm">
                     <span className="font-semibold text-ink">Published &amp; distributed.</span>{" "}
                     Routed to{" "}
