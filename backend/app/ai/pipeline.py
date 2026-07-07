@@ -35,6 +35,16 @@ PER_CHUNK_FLOOR = 60    # keep each chunk summary readable
 STOP_FACTOR = 1.4       # accept the result once it is within 1.4x the page target
 MAX_DEPTH = 4           # recursion guard
 
+# Circular/direction number references, e.g. "Circular No. 32/2017",
+# "Directions No. 03 of 2017", "No. 04 of 2024", "04/2024", "04 of 2024".
+_CIRCULAR_NO_RE = re.compile(
+    r"\b(?:Circular|Direction|Directions|Instruction|Instructions)?\s*"
+    r"No\.?\s*\d+\s*(?:of|/)\s*\d{4}\b"
+    r"|\b\d+\s+of\s+\d{4}\b"
+    r"|\b\d+/\d{4}\b",
+    re.IGNORECASE,
+)
+
 # spaCy entity labels we surface as tags (FR-15).
 _KEEP_LABELS = {"DATE", "MONEY", "PERCENT", "ORG", "GPE", "LAW", "CARDINAL"}
 # Map spaCy labels to the friendlier tags used in the UI.
@@ -181,28 +191,54 @@ class AIEngine(NLPPipeline):
                   f"Question: {question}\nContext: {context}")
         return self._abstractive(prompt, target_words)
 
-    def extract_entities(self, text: str) -> list:
-        """FR-11/15: spaCy NER for dates, amounts, regulatory references, etc."""
+    def extract_entities(self, text: str, top_n: int = 5) -> list:
+        """FR-11/15: spaCy NER for dates, amounts, regulatory references, etc.
+
+        Returns only the `top_n` most relevant entities, ranked by how often each
+        appears in the document (frequency is a simple, intuitive salience proxy).
+        """
+        clean = _clean_text(text)[:100_000]
         nlp = self._load_spacy()
-        doc = nlp(_clean_text(text)[:100_000])  # guard against pathological inputs
+        doc = nlp(clean)  # guard against pathological inputs
+        low = clean.lower()
+
         seen, ents = set(), []
         for ent in doc.ents:
             if ent.label_ not in _KEEP_LABELS:
                 continue
             label = _LABEL_ALIAS.get(ent.label_, ent.label_)
-            key = (ent.text.strip(), label)
-            if key in seen or not ent.text.strip():
+            txt = ent.text.strip()
+            key = (txt, label)
+            if key in seen or not txt:
                 continue
             seen.add(key)
-            ents.append({"text": ent.text.strip(), "label": label})
-        # Regex catch for explicit circular/direction references (FR-11).
-        for m in re.findall(r"\b(?:Circular|Direction)\s+No\.?\s*[\w/\-]+", text,
-                            flags=re.IGNORECASE):
-            key = (m.strip(), "REGULATION")
-            if key not in seen:
+            ents.append({"text": txt, "label": label})
+        # Regex catch for explicit circular/direction references (FR-11), including
+        # numbers written as "04 of 2024" or "04/2024" (which spaCy otherwise splits
+        # into "04" + "2024"). Longer matches first so the full number wins.
+        for m in re.findall(_CIRCULAR_NO_RE, text):
+            m = re.sub(r"\s+", " ", m).strip()
+            key = (m, "REGULATION")
+            if key not in seen and m:
                 seen.add(key)
-                ents.append({"text": m.strip(), "label": "REGULATION"})
-        return ents[:30]
+                ents.append({"text": m, "label": "REGULATION"})
+
+        # Drop anything already contained in a circular-number entity, so
+        # "04 of 2024" doesn't also appear as "04"/"2024", and the fuller
+        # "Circular No. 04 of 2024" wins over the bare "04 of 2024".
+        reg_texts = [e["text"].lower() for e in ents if e["label"] == "REGULATION"]
+        ents = [e for e in ents if not any(
+            e["text"].lower() != r and e["text"].lower() in r for r in reg_texts
+        )]
+
+        # Rank by frequency of mention (regulatory references get a small boost),
+        # then keep the most relevant few. Ties preserve first-seen order.
+        for idx, e in enumerate(ents):
+            count = low.count(e["text"].lower())
+            boost = 1 if e["label"] == "REGULATION" else 0
+            e["_rank"] = (count + boost, -idx)
+        ents.sort(key=lambda e: e["_rank"], reverse=True)
+        return [{"text": e["text"], "label": e["label"]} for e in ents[:top_n]]
 
     def classify(self, text: str) -> list:
         """Keyword heuristic for compliance category (used by Phase 4, FR-18)."""

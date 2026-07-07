@@ -9,13 +9,13 @@ const TAG_STYLES = {
   PLACE: "bg-slate-100 text-ink",
 };
 
-export default function EntityTags({ entities = [] }) {
+export default function EntityTags({ entities = [], limit = 5 }) {
   if (!entities.length) {
     return <p className="text-xs text-ink-muted">No entities detected.</p>;
   }
   return (
     <div className="flex flex-wrap gap-2">
-      {entities.map((e, i) => (
+      {entities.slice(0, limit).map((e, i) => (
         <span
           key={`${e.text}-${i}`}
           className={`badge ${TAG_STYLES[e.label] || "bg-slate-100 text-ink"}`}
