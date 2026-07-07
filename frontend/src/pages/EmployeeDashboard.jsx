@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import client from "../api/client";
 import StatusBadge from "../components/StatusBadge.jsx";
+import ChatPanel from "../components/ChatPanel.jsx";
+import Icon from "../components/Icon.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 
 // WF-02 — circular list view (FR-27–29). Live data, search + filters.
@@ -47,6 +49,7 @@ export default function EmployeeDashboard() {
   const [flag, setFlag] = useState(null);      // circular being flagged
   const [flagMsg, setFlagMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);  // global assistant drawer
 
   async function load() {
     setLoading(true);
@@ -277,6 +280,31 @@ export default function EmployeeDashboard() {
             </div>
           </form>
         </Modal>
+      )}
+
+      {/* Global RAG assistant — ask about any circular (FR-36–39) */}
+      {chatOpen ? (
+        <div className="fixed bottom-4 right-4 z-40 w-[22rem] max-w-[calc(100vw-2rem)] shadow-card">
+          <div className="mb-2 flex justify-end">
+            <button
+              onClick={() => setChatOpen(false)}
+              className="grid h-8 w-8 place-items-center rounded-full border border-ink-line bg-white text-sm text-ink hover:bg-ink-surface"
+              title="Close assistant"
+            >
+              ✕
+            </button>
+          </div>
+          <ChatPanel />
+        </div>
+      ) : (
+        <button
+          onClick={() => setChatOpen(true)}
+          className="btn-primary fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full px-4 py-3 shadow-card"
+          title="Ask the Circular Assistant"
+        >
+          <Icon name="chat" className="h-5 w-5" />
+          <span className="hidden sm:inline">Assistant</span>
+        </button>
       )}
     </div>
   );

@@ -85,21 +85,33 @@ class VectorIndex:
         return {"total_vectors": len(chunks), "dimension": self.dimension}
 
     # ---- search (FR-37) ------------------------------------------------
-    def search(self, query, top_k=5):
-        """Return the top-K most relevant chunks for a query."""
+    def search(self, query, top_k=5, circular_id=None):
+        """Return the top-K most relevant chunks for a query.
+
+        When `circular_id` is given, results are restricted to that circular
+        (the "ask about this circular only" mode). Because the index is flat
+        (exhaustive), we over-fetch and filter — no separate index needed.
+        """
         if self._index is None or not self._chunks:
             return []
         model = self._load_model()
         q = model.encode([query], normalize_embeddings=True,
                          convert_to_numpy=True).astype("float32")
-        scores, idx = self._index.search(q, min(top_k, len(self._chunks)))
+        # Scoped search must scan all vectors so it can find that circular's
+        # chunks even when other circulars rank higher globally.
+        k = len(self._chunks) if circular_id is not None else min(top_k, len(self._chunks))
+        scores, idx = self._index.search(q, k)
         results = []
         for rank, i in enumerate(idx[0]):
             if i == -1:
                 continue
             chunk = dict(self._chunks[i])
+            if circular_id is not None and chunk.get("circular_id") != circular_id:
+                continue
             chunk["score"] = float(scores[0][rank])
             results.append(chunk)
+            if len(results) >= top_k:
+                break
         return results
 
     # ---- persistence ---------------------------------------------------

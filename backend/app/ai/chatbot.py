@@ -103,8 +103,9 @@ class ChatbotService:
         return answer
 
     # ---- public API ----------------------------------------------------
-    def answer(self, question: str, top_k: int = 5) -> dict:
-        results = self.index.search(question, top_k=top_k)   # FR-37
+    def answer(self, question: str, top_k: int = 5, circular_id=None) -> dict:
+        # circular_id scopes retrieval to a single circular (per-circular chat).
+        results = self.index.search(question, top_k=top_k, circular_id=circular_id)   # FR-37
         if not results:
             return {
                 "answer": ("I couldn't find a relevant circular for that question. "

@@ -6,7 +6,8 @@ Importing this package registers every model with SQLAlchemy so that
 from .identity import User, Department, CircularDepartment
 from .circular import Circular, Summary, Classification
 from .engagement import Acknowledgement, Notification
-from .system import AuditLog, ChatLog, VectorIndexMetadata, ChangeRequest
+from .system import (AuditLog, ChatLog, ChatConversation, VectorIndexMetadata,
+                     ChangeRequest)
 
 __all__ = [
     "User",
@@ -19,6 +20,7 @@ __all__ = [
     "Notification",
     "AuditLog",
     "ChatLog",
+    "ChatConversation",
     "VectorIndexMetadata",
     "ChangeRequest",
 ]

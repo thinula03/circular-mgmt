@@ -31,12 +31,49 @@ class AuditLog(db.Model):
         }
 
 
+class ChatConversation(db.Model):
+    """CHAT_CONVERSATIONS — a ChatGPT-style conversation grouping chat messages.
+
+    Scope is set by circular_id: NULL = a global conversation (ask about any
+    circular); a value = a conversation scoped to that single circular. Global and
+    per-circular conversations are listed separately in the UI.
+    """
+    __tablename__ = "chat_conversations"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    circular_id = db.Column(db.Integer, db.ForeignKey("circulars.id"))  # NULL = global
+    title = db.Column(db.String(200), nullable=False, default="New chat")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    messages = db.relationship("ChatLog", backref="conversation",
+                               order_by="ChatLog.created_at",
+                               cascade="all, delete-orphan")
+
+    def to_dict(self, with_messages=False):
+        data = {
+            "id": self.id,
+            "user_id": self.user_id,
+            "circular_id": self.circular_id,
+            "title": self.title,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "message_count": len(self.messages),
+        }
+        if with_messages:
+            data["messages"] = [m.to_dict() for m in self.messages]
+        return data
+
+
 class ChatLog(db.Model):
     """CHAT_LOG — RAG chatbot question/answer pairs with citations (FR-39)."""
     __tablename__ = "chat_log"
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    conversation_id = db.Column(db.Integer,
+                                db.ForeignKey("chat_conversations.id"))
     question = db.Column(db.Text, nullable=False)
     answer = db.Column(db.Text, nullable=False)
     citations = db.Column(db.JSON)        # list of {circular_number, section}
@@ -46,6 +83,7 @@ class ChatLog(db.Model):
         return {
             "id": self.id,
             "user_id": self.user_id,
+            "conversation_id": self.conversation_id,
             "question": self.question,
             "answer": self.answer,
             "citations": self.citations or [],

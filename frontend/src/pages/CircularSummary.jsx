@@ -220,9 +220,9 @@ export default function CircularSummary() {
           )}
         </section>
 
-        {/* Right: RAG chatbot (FR-36–39) */}
+        {/* Right: RAG chatbot (FR-36–39) — scoped to this circular */}
         <div className="lg:col-span-2">
-          <ChatPanel />
+          <ChatPanel circularId={circular.id} />
         </div>
       </div>
 
