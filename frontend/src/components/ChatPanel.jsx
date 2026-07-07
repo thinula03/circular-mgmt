@@ -71,10 +71,10 @@ export default function ChatPanel() {
               <div className="whitespace-pre-wrap leading-relaxed">{m.text}</div>
               {m.citations?.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
-                  {m.citations.map((c, j) => (
-                    <span key={j} className="badge bg-white text-[11px] text-ink-muted">
+                  {[...new Set(m.citations.map((c) => c.circular_number))].map((num) => (
+                    <span key={num} className="badge bg-white text-[11px] text-ink-muted">
                       <Icon name="document" className="h-3 w-3" />
-                      {c.circular_number} · {c.section}
+                      {num}
                     </span>
                   ))}
                 </div>
