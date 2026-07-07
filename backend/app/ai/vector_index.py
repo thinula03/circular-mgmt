@@ -7,7 +7,12 @@ persisted to disk so they survive restarts, and rebuilt whenever a circular is
 published. All inference is local/offline (NFR-08).
 """
 import os
+import re
+import math
 import json
+import logging
+
+log = logging.getLogger(__name__)
 
 # Load Sentence-BERT from the Phase-0 offline cache.
 _BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -32,6 +37,7 @@ class VectorIndex:
         self._model = None
         self._index = None
         self._chunks = []      # metadata aligned 1:1 with index rows
+        self._bm25 = None      # lazily-built BM25 stats over chunk texts
         os.makedirs(_INDEX_DIR, exist_ok=True)
         self._index_path = os.path.join(_INDEX_DIR, "circulars.faiss")
         self._meta_path = os.path.join(_INDEX_DIR, "chunks.json")
@@ -70,7 +76,7 @@ class VectorIndex:
                 texts.append(chunk)
 
         if not texts:
-            self._index, self._chunks = None, []
+            self._index, self._chunks, self._bm25 = None, [], None
             self._persist()
             return {"total_vectors": 0, "dimension": self.dimension}
 
@@ -81,38 +87,107 @@ class VectorIndex:
         index.add(emb)
         self._index = index
         self._chunks = chunks
+        self._bm25 = None      # rebuilt lazily on next search
         self._persist()
         return {"total_vectors": len(chunks), "dimension": self.dimension}
 
-    # ---- search (FR-37) ------------------------------------------------
+    # ---- hybrid search (FR-37): dense (SBERT) + sparse (BM25) ----------
     def search(self, query, top_k=5, circular_id=None):
-        """Return the top-K most relevant chunks for a query.
+        """Return the top-K most relevant chunks using hybrid retrieval.
 
-        When `circular_id` is given, results are restricted to that circular
-        (the "ask about this circular only" mode). Because the index is flat
-        (exhaustive), we over-fetch and filter — no separate index needed.
+        Combines dense semantic ranking (SBERT/FAISS) with sparse keyword
+        ranking (BM25) via Reciprocal Rank Fusion. Dense catches paraphrase;
+        BM25 catches exact terms, numbers, dates and acronyms (AML, KYC, "14
+        days") that dense embeddings miss — important for regulatory text.
+
+        When `circular_id` is given, retrieval is restricted to that circular.
         """
         if self._index is None or not self._chunks:
             return []
+
+        # Candidate rows, respecting the circular scope.
+        candidates = [i for i, c in enumerate(self._chunks)
+                      if circular_id is None or c.get("circular_id") == circular_id]
+        if not candidates:
+            return []
+
+        dense_order = self._dense_ranks(query, candidates)
+        sparse_order = self._bm25_ranks(query, candidates)
+
+        # Reciprocal Rank Fusion (k=60 is the standard constant).
+        RRF_K = 60
+        fused = {}
+        for rank, i in enumerate(dense_order):
+            fused[i] = fused.get(i, 0.0) + 1.0 / (RRF_K + rank)
+        for rank, i in enumerate(sparse_order):
+            fused[i] = fused.get(i, 0.0) + 1.0 / (RRF_K + rank)
+
+        order = sorted(fused, key=lambda i: fused[i], reverse=True)[:top_k]
+        results = []
+        for i in order:
+            chunk = dict(self._chunks[i])
+            chunk["score"] = round(fused[i], 6)
+            results.append(chunk)
+
+        # Diagnostic: which chunks were retrieved for this query.
+        log.debug("RAG retrieve q=%r scope=%s -> %s", query, circular_id,
+                  [(c["circular_number"], c["section"], c["score"]) for c in results])
+        return results
+
+    def _dense_ranks(self, query, candidates):
+        """Candidate row indices ordered by SBERT cosine similarity (best first)."""
         model = self._load_model()
         q = model.encode([query], normalize_embeddings=True,
                          convert_to_numpy=True).astype("float32")
-        # Scoped search must scan all vectors so it can find that circular's
-        # chunks even when other circulars rank higher globally.
-        k = len(self._chunks) if circular_id is not None else min(top_k, len(self._chunks))
-        scores, idx = self._index.search(q, k)
-        results = []
-        for rank, i in enumerate(idx[0]):
-            if i == -1:
+        _, idx = self._index.search(q, self._index.ntotal)  # full ranking
+        cand = set(candidates)
+        return [int(i) for i in idx[0] if int(i) in cand]
+
+    # ---- BM25 (self-contained, no extra dependency) --------------------
+    @staticmethod
+    def _tokenize(text):
+        # Keep alphanumerics plus '/' so circular numbers (e.g. 02/2024) survive.
+        return re.findall(r"[a-z0-9/]+", (text or "").lower())
+
+    def _ensure_bm25(self):
+        if self._bm25 is not None:
+            return
+        docs = [self._tokenize(c.get("text", "")) for c in self._chunks]
+        df = {}
+        for d in docs:
+            for t in set(d):
+                df[t] = df.get(t, 0) + 1
+        n = len(docs)
+        idf = {t: math.log(1 + (n - f + 0.5) / (f + 0.5)) for t, f in df.items()}
+        dl = [len(d) for d in docs]
+        avgdl = (sum(dl) / n) if n else 0.0
+        self._bm25 = {"docs": docs, "idf": idf, "dl": dl, "avgdl": avgdl or 1.0}
+
+    def _bm25_ranks(self, query, candidates, k1=1.5, b=0.75):
+        """Candidate row indices ordered by BM25 keyword score (best first)."""
+        self._ensure_bm25()
+        st = self._bm25
+        q_terms = self._tokenize(query)
+        scored = []
+        for i in candidates:
+            doc = st["docs"][i]
+            if not doc:
+                scored.append((i, 0.0))
                 continue
-            chunk = dict(self._chunks[i])
-            if circular_id is not None and chunk.get("circular_id") != circular_id:
-                continue
-            chunk["score"] = float(scores[0][rank])
-            results.append(chunk)
-            if len(results) >= top_k:
-                break
-        return results
+            tf = {}
+            for t in doc:
+                tf[t] = tf.get(t, 0) + 1
+            dl = st["dl"][i]
+            s = 0.0
+            for t in q_terms:
+                f = tf.get(t)
+                if not f:
+                    continue
+                idf = st["idf"].get(t, 0.0)
+                s += idf * (f * (k1 + 1)) / (f + k1 * (1 - b + b * dl / st["avgdl"]))
+            scored.append((i, s))
+        scored.sort(key=lambda x: x[1], reverse=True)
+        return [i for i, _ in scored]
 
     # ---- persistence ---------------------------------------------------
     def _persist(self):

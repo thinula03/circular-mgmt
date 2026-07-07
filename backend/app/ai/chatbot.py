@@ -9,9 +9,23 @@ exact wording — including enumerated document lists (a./b./c.) — not a parap
 So instead of abstractive summarisation (which collapses lists), we return the
 relevant source passage verbatim, located by semantic line matching.
 """
+import os
 import re
+import logging
 
 from .vector_index import VectorIndex
+
+log = logging.getLogger(__name__)
+
+_BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_HUB_CACHE = os.path.join(_BACKEND_ROOT, "model_cache", "hub")
+
+# Extractive QA reader: pinpoints the exact answer span in the retrieved text and
+# returns a confidence score. Optional — if the model isn't in the local cache,
+# the chatbot falls back to semantic passage extraction. Download with
+# `python download_models.py` (added to the model list).
+_QA_MODEL = "distilbert-base-cased-distilled-squad"
+_QA_MIN_SCORE = 0.20     # below this the reader is treated as "not confident"
 
 # Enumerated list markers: a.  b)  i.  iv)  1.  -  •
 _ITEM_RE = re.compile(r"^\s*(?:[a-zA-Z]|[ivxlcdm]{1,5}|\d{1,2})[.)]\s+|^\s*[-•·]\s+", re.I)
@@ -28,6 +42,67 @@ class ChatbotService:
     def __init__(self, vector_index: VectorIndex, config=None):
         self.index = vector_index
         self.config = config or {}
+        self._qa = None   # lazily-loaded extractive QA pipeline (or False if absent)
+
+    # ---- optional extractive QA reader ---------------------------------
+    def _load_qa(self):
+        """Load the extractive QA pipeline from the local cache, once.
+
+        Returns the pipeline, or False if the model isn't downloaded (so the
+        caller can fall back to semantic extraction without erroring).
+        """
+        if self._qa is None:
+            try:
+                from transformers import (AutoTokenizer,
+                                          AutoModelForQuestionAnswering,
+                                          pipeline as hf_pipeline)
+                kw = {"cache_dir": _HUB_CACHE, "local_files_only": True}
+                tok = AutoTokenizer.from_pretrained(_QA_MODEL, **kw)
+                mdl = AutoModelForQuestionAnswering.from_pretrained(_QA_MODEL, **kw)
+                self._qa = hf_pipeline("question-answering", model=mdl, tokenizer=tok)
+                log.info("QA reader loaded: %s", _QA_MODEL)
+            except Exception as exc:  # noqa: BLE001 — model not cached / load failed
+                log.info("QA reader unavailable (%s); using extractive fallback.", exc)
+                self._qa = False
+        return self._qa
+
+    def _qa_answer(self, question, results):
+        """Run the QA reader over retrieved chunks; return (answer, result) or None."""
+        qa = self._load_qa()
+        if not qa:
+            return None
+        best = None
+        for r in results[:4]:
+            try:
+                out = qa(question=question, context=r["text"])
+            except Exception:  # noqa: BLE001
+                continue
+            if best is None or out.get("score", 0) > best[0]:
+                best = (out.get("score", 0.0), out.get("answer", "").strip(), r)
+        if not best or best[0] < _QA_MIN_SCORE or not best[1]:
+            log.debug("QA low confidence (%.3f) — falling back.", best[0] if best else 0)
+            return None
+        score, span, result = best
+        # Expand the span to the full sentence it sits in, for a readable answer.
+        answer = self._sentence_around(result["text"], span) or span
+        log.debug("QA answer (%.3f): %r", score, answer)
+        return answer, result
+
+    @staticmethod
+    def _sentence_around(text, span):
+        """Return the sentence in `text` that contains `span` (verbatim)."""
+        flat = re.sub(r"\s+", " ", text)
+        pos = flat.lower().find(span.lower())
+        if pos < 0:
+            return None
+        sents = re.split(r"(?<=[.!?])\s+", flat)
+        cursor = 0
+        for s in sents:
+            start = flat.find(s, cursor)
+            cursor = start + len(s)
+            if start <= pos < cursor:
+                return s.strip()
+        return None
 
     # ---- helpers -------------------------------------------------------
     @staticmethod
@@ -113,6 +188,14 @@ class ChatbotService:
                 "citations": [],
             }
 
+        # Preferred path: an extractive QA reader pinpoints the answer span with a
+        # confidence score. If unavailable/low-confidence, fall back to semantic
+        # passage extraction below.
+        qa = self._qa_answer(question, results)
+        if qa is not None:
+            answer, best_result = qa
+            return {"answer": answer, "citations": self._citations(best_result, results)}
+
         # Score individual lines from the top chunks to find the most relevant one.
         model = self.index._load_model()
         candidates = []  # (line, result)
@@ -145,9 +228,13 @@ class ChatbotService:
             else:
                 answer = self._extract_sentences(lines, question, model) or best_line
 
-        # Citations: the chunk the answer came from first, then other sources.
+        return {"answer": answer, "citations": self._citations(best_result, results)}
+
+    @staticmethod
+    def _citations(best_result, results):
+        """The answer's source chunk first, then other retrieved sources (max 4)."""
         seen, citations = set(), []
-        for r in [best_result] + results:
+        for r in [best_result] + list(results):
             key = (r["circular_number"], r["section"])
             if key not in seen:
                 seen.add(key)
@@ -155,4 +242,4 @@ class ChatbotService:
                                   "section": r["section"]})
             if len(citations) >= 4:
                 break
-        return {"answer": answer, "citations": citations}
+        return citations

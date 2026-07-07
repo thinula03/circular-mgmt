@@ -5,6 +5,7 @@ Downloads (into backend/model_cache/ via HF_HOME):
   - facebook/bart-large-cnn               (FR-13 abstractive summary)
   - sshleifer/distilbart-cnn-12-6         (FR-16 lightweight fallback)
   - sentence-transformers/all-MiniLM-L6-v2 (FR-37 RAG embeddings)
+  - distilbert-base-cased-distilled-squad (FR-38 extractive QA reader)
 
 Run once:  python download_models.py
 The spaCy model (en_core_web_sm) is installed separately via `spacy download`.
@@ -29,6 +30,7 @@ MODELS = [
     "facebook/bart-large-cnn",
     "sshleifer/distilbart-cnn-12-6",
     "sentence-transformers/all-MiniLM-L6-v2",
+    "distilbert-base-cased-distilled-squad",   # extractive QA reader (FR-38)
 ]
 
 

@@ -1,0 +1,96 @@
+"""RAG evaluation harness — measure retrieval + answer accuracy.
+
+Runs a set of question/expected-answer pairs through the chatbot and reports:
+  * Retrieval hit-rate — did the expected source circular appear in the citations?
+  * Answer accuracy    — did the answer contain the expected keyword(s)?
+
+Use it to compare the chatbot before/after changes (e.g. hybrid retrieval, QA
+reader) with an objective number for the thesis evaluation chapter.
+
+Setup:
+  1. Ensure MySQL is running and circulars are published.
+  2. Edit eval_questions.json (see the template created on first run).
+  3. Run:  python eval_rag.py
+
+Each eval item: {"question": ..., "expected_circular": "02/2024",
+                 "expected_keywords": ["14 days", "enhanced due diligence"]}
+`expected_circular` and `expected_keywords` are both optional.
+"""
+import json
+import os
+
+from app import create_app
+from app.extensions import db
+from app.models.circular import Circular
+from app.ai import get_index, get_chatbot
+
+EVAL_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "eval_questions.json")
+
+_TEMPLATE = [
+    {
+        "question": "What is the deadline to acknowledge this circular?",
+        "expected_circular": "",
+        "expected_keywords": ["days"],
+    }
+]
+
+
+def load_eval():
+    if not os.path.exists(EVAL_FILE):
+        with open(EVAL_FILE, "w", encoding="utf-8") as fh:
+            json.dump(_TEMPLATE, fh, indent=2)
+        print(f"Created a template eval set at {EVAL_FILE}. Fill it in and re-run.")
+        return []
+    with open(EVAL_FILE, "r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def main():
+    app = create_app()
+    with app.app_context():
+        items = load_eval()
+        if not items:
+            return
+
+        index = get_index(app.config)
+        if index.is_empty():
+            index.build(Circular.query.filter_by(status="published").all())
+        chatbot = get_chatbot(app.config)
+
+        retr_hits = ans_hits = retr_total = ans_total = 0
+        print(f"\nEvaluating {len(items)} questions\n" + "=" * 60)
+        for it in items:
+            q = it["question"]
+            res = chatbot.answer(q, top_k=5)
+            ans = res["answer"]
+            cited = {c["circular_number"] for c in res["citations"]}
+
+            line = f"\nQ: {q}\nA: {ans[:200]}\n   cited: {sorted(cited)}"
+
+            exp_c = (it.get("expected_circular") or "").strip()
+            if exp_c:
+                retr_total += 1
+                ok = exp_c in cited
+                retr_hits += ok
+                line += f"\n   retrieval: {'HIT' if ok else 'MISS'} (expected {exp_c})"
+
+            kws = it.get("expected_keywords") or []
+            if kws:
+                ans_total += 1
+                ok = any(k.lower() in ans.lower() for k in kws)
+                ans_hits += ok
+                line += f"\n   answer:    {'HIT' if ok else 'MISS'} (expected one of {kws})"
+            print(line)
+
+        print("\n" + "=" * 60)
+        if retr_total:
+            print(f"Retrieval hit-rate: {retr_hits}/{retr_total} "
+                  f"= {retr_hits / retr_total:.0%}")
+        if ans_total:
+            print(f"Answer accuracy:    {ans_hits}/{ans_total} "
+                  f"= {ans_hits / ans_total:.0%}")
+        db.session.remove()
+
+
+if __name__ == "__main__":
+    main()

@@ -14,6 +14,8 @@ bcrypt==4.2.0            # NFR-06 password hashing
 
 # ===== PDF processing =====
 PyMuPDF==1.24.10         # FR-07 text extraction
+pytesseract==0.3.13      # FR-07 OCR fallback for scanned PDFs (needs Tesseract engine)
+Pillow==10.4.0           # image handling for OCR
 
 # ===== AI / NLP (local inference, NFR-08) =====
 spacy==3.7.6             # FR-11 preprocessing + NER
