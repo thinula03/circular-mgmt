@@ -239,7 +239,8 @@ class ChatbotService:
             if key not in seen:
                 seen.add(key)
                 citations.append({"circular_number": r["circular_number"],
-                                  "section": r["section"]})
+                                  "section": r["section"],
+                                  "superseded": r.get("superseded", False)})
             if len(citations) >= 4:
                 break
         return citations

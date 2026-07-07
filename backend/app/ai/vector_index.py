@@ -61,6 +61,10 @@ class VectorIndex:
         import faiss
         import numpy as np
 
+        # A circular is superseded if a (published) circular in this set amends it.
+        superseded_ids = {c.amends_circular_id for c in circulars
+                          if getattr(c, "amends_circular_id", None)}
+
         chunks, texts = [], []
         for c in circulars:
             text = (getattr(c, "extracted_text", "") or "").strip()
@@ -71,6 +75,7 @@ class VectorIndex:
                     "circular_id": c.id,
                     "circular_number": c.circular_number,
                     "section": f"para {i + 1}",
+                    "superseded": c.id in superseded_ids,
                     "text": chunk,
                 })
                 texts.append(chunk)
@@ -121,6 +126,11 @@ class VectorIndex:
             fused[i] = fused.get(i, 0.0) + 1.0 / (RRF_K + rank)
         for rank, i in enumerate(sparse_order):
             fused[i] = fused.get(i, 0.0) + 1.0 / (RRF_K + rank)
+
+        # Prefer current circulars: gently demote superseded (amended) chunks.
+        for i in fused:
+            if self._chunks[i].get("superseded"):
+                fused[i] *= 0.85
 
         order = sorted(fused, key=lambda i: fused[i], reverse=True)[:top_k]
         results = []

@@ -21,6 +21,8 @@ class Circular(db.Model):
     status = db.Column(db.String(20), default="uploaded")
     ack_deadline = db.Column(db.DateTime)          # FR-25
     uploaded_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+    # The earlier circular this one amends (self-reference). NULL for most.
+    amends_circular_id = db.Column(db.Integer, db.ForeignKey("circulars.id"))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     published_at = db.Column(db.DateTime)
 
@@ -28,6 +30,27 @@ class Circular(db.Model):
     classifications = db.relationship("Classification", back_populates="circular")
     departments = db.relationship("CircularDepartment", backref="circular_link")
     acknowledgements = db.relationship("Acknowledgement", back_populates="circular")
+    # `amends` = the circular this one amends; `amended_by` = circulars amending this one.
+    amends = db.relationship("Circular", remote_side=[id],
+                             foreign_keys=[amends_circular_id],
+                             backref="amended_by")
+
+    # ---- amendment / supersede helpers (derived, nothing stored) --------
+    @property
+    def superseding(self):
+        """Published circulars that amend this one (newest first)."""
+        pub = [c for c in self.amended_by if c.status == "published"]
+        return sorted(pub, key=lambda c: (c.published_at or c.created_at or datetime.min),
+                      reverse=True)
+
+    @property
+    def is_superseded(self):
+        return len(self.superseding) > 0
+
+    @property
+    def latest_amender(self):
+        s = self.superseding
+        return s[0] if s else None
 
     def to_dict(self, include_text=False):
         data = {
@@ -40,10 +63,21 @@ class Circular(db.Model):
             "status": self.status,
             "ack_deadline": self.ack_deadline.isoformat() if self.ack_deadline else None,
             "published_at": self.published_at.isoformat() if self.published_at else None,
+            "amends_circular_id": self.amends_circular_id,
+            "amends": self._ref(self.amends),
+            "amended_by": self._ref(self.latest_amender),
+            "is_superseded": self.is_superseded,
         }
         if include_text:
             data["extracted_text"] = self.extracted_text
         return data
+
+    @staticmethod
+    def _ref(c):
+        """Compact reference to a related circular (or None)."""
+        if not c:
+            return None
+        return {"id": c.id, "circular_number": c.circular_number, "title": c.title}
 
 
 class Summary(db.Model):

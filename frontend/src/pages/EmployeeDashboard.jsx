@@ -84,6 +84,7 @@ export default function EmployeeDashboard() {
         title: edit.title,
         issue_date: edit.issue_date,
         priority: edit.priority,
+        amends_circular_id: edit.amends_circular_id || null,
       });
       setEdit(null);
       await load();
@@ -177,7 +178,17 @@ export default function EmployeeDashboard() {
               items.map((c) => (
                 <tr key={c.id} className="hover:bg-ink-surface/60">
                   <td className="px-4 py-3 font-mono text-xs text-ink-muted">{c.circular_number}</td>
-                  <td className="px-4 py-3 font-medium text-ink">{c.title}</td>
+                  <td className="px-4 py-3 font-medium text-ink">
+                    {c.title}
+                    {c.is_superseded && (
+                      <span className="ml-2 badge bg-amber-50 text-status-read">Superseded</span>
+                    )}
+                    {c.amends && (
+                      <span className="ml-2 badge bg-slate-100 text-ink-muted">
+                        Amends {c.amends.circular_number}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
                       {c.categories?.map((cat) => (
@@ -214,6 +225,7 @@ export default function EmployeeDashboard() {
                             onClick={() => setEdit({
                               id: c.id, circular_number: c.circular_number, title: c.title,
                               issue_date: c.issue_date || "", priority: c.priority,
+                              amends_circular_id: c.amends_circular_id || "",
                             })}
                             className="btn-ghost py-1.5 text-xs">Edit</button>
                           <button onClick={() => remove(c)}
@@ -253,6 +265,15 @@ export default function EmployeeDashboard() {
                 </select>
               </Field>
             </div>
+            <Field label="Amends an earlier circular (optional)">
+              <select className="input" value={edit.amends_circular_id || ""}
+                onChange={(e) => setEdit({ ...edit, amends_circular_id: e.target.value })}>
+                <option value="">— None —</option>
+                {items.filter((c) => c.id !== edit.id).map((c) => (
+                  <option key={c.id} value={c.id}>{c.circular_number} — {c.title}</option>
+                ))}
+              </select>
+            </Field>
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setEdit(null)} className="btn-ghost">Cancel</button>
               <button type="submit" disabled={busy} className="btn-primary">

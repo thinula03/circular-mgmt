@@ -8,6 +8,17 @@ import Icon from "./Icon.jsx";
 // Messages are grouped into conversations; a history list lets the user reopen
 // past conversations or start a new chat. Global and per-circular conversations
 // are kept in separate history lists (scoped by the same `circularId`).
+// Collapse citations to one badge per circular, keeping its superseded flag.
+function dedupeCitations(citations) {
+  const map = new Map();
+  citations.forEach((c) => {
+    if (!map.has(c.circular_number)) {
+      map.set(c.circular_number, { number: c.circular_number, superseded: !!c.superseded });
+    }
+  });
+  return [...map.values()];
+}
+
 export default function ChatPanel({ circularId = null }) {
   const scoped = circularId != null;
 
@@ -187,10 +198,10 @@ export default function ChatPanel({ circularId = null }) {
                 <div className="whitespace-pre-wrap leading-relaxed">{m.text}</div>
                 {m.citations?.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
-                    {[...new Set(m.citations.map((c) => c.circular_number))].map((num) => (
-                      <span key={num} className="badge bg-white text-[11px] text-ink-muted">
+                    {dedupeCitations(m.citations).map(({ number, superseded }) => (
+                      <span key={number} className="badge bg-white text-[11px] text-ink-muted">
                         <Icon name="document" className="h-3 w-3" />
-                        {num}
+                        {number}{superseded ? " (superseded)" : ""}
                       </span>
                     ))}
                   </div>

@@ -136,6 +136,24 @@ export default function CircularSummary() {
         <Link to="/" className="btn-ghost py-1.5 text-xs">← Back to list</Link>
       </div>
 
+      {/* Amendment banners */}
+      {circular.amends && (
+        <div className="rounded-lg border border-ink-line bg-ink-surface px-3 py-2 text-sm text-ink">
+          This circular <span className="font-semibold">amends</span>{" "}
+          <Link to={`/circulars/${circular.amends.id}`} className="text-brand-600 hover:underline">
+            {circular.amends.circular_number} — {circular.amends.title}
+          </Link>.
+        </div>
+      )}
+      {circular.is_superseded && circular.amended_by && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-ink">
+          <span className="font-semibold text-status-read">Superseded.</span> Amended by{" "}
+          <Link to={`/circulars/${circular.amended_by.id}`} className="text-brand-600 hover:underline">
+            {circular.amended_by.circular_number} — {circular.amended_by.title}
+          </Link>.
+        </div>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-5">
         {/* Left: summary + entities + acknowledge */}
         <section className="card space-y-4 p-6 lg:col-span-3">

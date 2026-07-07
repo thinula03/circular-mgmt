@@ -171,6 +171,20 @@ def edit_circular(circular_id):
                 return jsonify({"error": "issue_date must be YYYY-MM-DD."}), 400
         else:
             circular.issue_date = None
+    if "amends_circular_id" in data:
+        raw = data["amends_circular_id"]
+        if raw in (None, "", 0, "0"):
+            circular.amends_circular_id = None
+        else:
+            try:
+                aid = int(raw)
+            except (TypeError, ValueError):
+                return jsonify({"error": "amends_circular_id must be a circular id."}), 400
+            if aid == circular.id:
+                return jsonify({"error": "A circular cannot amend itself."}), 400
+            if not Circular.query.get(aid):
+                return jsonify({"error": "The circular being amended was not found."}), 400
+            circular.amends_circular_id = aid
 
     db.session.commit()
     audit.record("CIRCULAR_EDITED", user_id=int(get_jwt_identity()),
@@ -349,6 +363,12 @@ def upload_circular():
         except ValueError:
             return jsonify({"error": "issue_date must be YYYY-MM-DD."}), 400
 
+    # Optional: the earlier circular this one amends (FR — amendments).
+    amends_raw = (request.form.get("amends_circular_id") or "").strip()
+    amends_id = int(amends_raw) if amends_raw.isdigit() else None
+    if amends_id and not Circular.query.get(amends_id):
+        return jsonify({"error": "The circular being amended was not found."}), 400
+
     # ---- duplicate detection (FR-10) ----
     if Circular.query.filter_by(circular_number=circular_number).first():
         return jsonify({
@@ -380,6 +400,7 @@ def upload_circular():
         priority=priority,
         status="uploaded",
         uploaded_by=int(get_jwt_identity()),
+        amends_circular_id=amends_id,
     )
     db.session.add(circular)
     db.session.commit()

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import client from "../api/client";
 import EntityTags from "../components/EntityTags.jsx";
 import Icon from "../components/Icon.jsx";
@@ -8,10 +8,17 @@ import Icon from "../components/Icon.jsx";
 // captures metadata, detects duplicates. Shows a live processing indicator and
 // an extraction result card on success.
 const MAX_MB = 20;
-const EMPTY = { circular_number: "", title: "", issue_date: "", priority: "Medium" };
+const EMPTY = { circular_number: "", title: "", issue_date: "", priority: "Medium",
+                amends_circular_id: "" };
 
 export default function AdminUpload() {
   const [form, setForm] = useState(EMPTY);
+  const [existing, setExisting] = useState([]);   // circulars available to amend
+
+  // Load existing circulars for the "amends" picker.
+  useEffect(() => {
+    client.get("/circulars").then((r) => setExisting(r.data)).catch(() => {});
+  }, []);
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState("idle"); // idle | uploading | done | error
   const [result, setResult] = useState(null);
@@ -263,6 +270,18 @@ export default function AdminUpload() {
           <select className="input" value={form.priority}
             onChange={(e) => setForm({ ...form, priority: e.target.value })}>
             <option>High</option><option>Medium</option><option>Low</option>
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-ink">
+            Amends an earlier circular <span className="text-ink-muted">(optional)</span>
+          </label>
+          <select className="input" value={form.amends_circular_id}
+            onChange={(e) => setForm({ ...form, amends_circular_id: e.target.value })}>
+            <option value="">— None —</option>
+            {existing.map((c) => (
+              <option key={c.id} value={c.id}>{c.circular_number} — {c.title}</option>
+            ))}
           </select>
         </div>
 
