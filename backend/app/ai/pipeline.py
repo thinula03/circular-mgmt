@@ -28,12 +28,22 @@ os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 # how long it is, via budget-allocated map-reduce. A single BART pass only emits
 # ~200 words, so long documents are chunked, each chunk gets a slice of the page
 # budget, and the parts are combined (and reduced again if still too long).
-PAGE_WORDS = 500        # ~1 page target (minimum ~500 words, any document length)
+# Length policy: summarise to ~1/3 of the source, capped at one page (400 words).
+# Short circulars get a proportional (1/3) summary; long ones get the one-page cap.
+PAGE_WORDS = 400        # one-page cap (upper bound on any summary)
+MIN_SUMMARY_WORDS = 80  # floor so tiny circulars still get a usable summary
+SUMMARY_RATIO = 3       # 1/3 rule: target ≈ source_words / 3
 CHUNK_WORDS = 700       # source chunk size (fits BART's ~1024-token input)
 PER_CHUNK_CAP = 250     # max words from one BART pass
 PER_CHUNK_FLOOR = 60    # keep each chunk summary readable
 STOP_FACTOR = 1.4       # accept the result once it is within 1.4x the page target
 MAX_DEPTH = 4           # recursion guard
+
+# Sentences expressing an obligation/action get boosted into the Key Points list.
+_REQUIRE_RE = re.compile(
+    r"\b(shall|must|required|require|mandatory|deadline|effective|"
+    r"within\s+\d+|by\s+\d{1,2}[./]|no later than|prohibited|not permitted|"
+    r"with effect from)\b", re.IGNORECASE)
 
 # Circular/direction number references, e.g. "Circular No. 32/2017",
 # "Directions No. 03 of 2017", "No. 04 of 2024", "04/2024", "04 of 2024".
@@ -47,6 +57,12 @@ _CIRCULAR_NO_RE = re.compile(
 
 # spaCy entity labels we surface as tags (FR-15).
 _KEEP_LABELS = {"DATE", "MONEY", "PERCENT", "ORG", "GPE", "LAW", "CARDINAL"}
+# Words that mark a genuine organisation — used to reject spaCy's false ORG tags
+# on generic title-case phrases like "Aggregate Capital".
+_ORG_KEYWORDS = ("bank", "association", "department", "authority", "commission",
+                 "ministry", "corporation", "ltd", "limited", "plc", "company",
+                 "board", "unit", "agency", "fund", "institute", "council",
+                 "bureau", "office", "division", "committee", "central", "sri lanka")
 # Map spaCy labels to the friendlier tags used in the UI.
 _LABEL_ALIAS = {"GPE": "PLACE", "ORG": "ORG", "LAW": "REGULATION", "CARDINAL": "NUMBER"}
 
@@ -128,17 +144,31 @@ class AIEngine(NLPPipeline):
 
     # ---- public API ----------------------------------------------------
     def summarize(self, text: str, page_words: int = None) -> SummaryResult:
-        """Condense a circular to ~1 page (page_words, default PAGE_WORDS).
+        """Condense a circular into a clear, structured summary.
 
-        spaCy NER (FR-11) runs on the whole document; the body is summarised to
-        the page target via map-reduce (FR-12/13) so even long circulars are
-        covered in full rather than truncated.
+        Length: the 1/3 rule — target ≈ source_words / 3, capped at one page
+        (PAGE_WORDS) and floored at MIN_SUMMARY_WORDS. An explicit page_words
+        overrides the computed target.
+
+        Structure (not one blob): an abstractive **Overview** paragraph (spaCy →
+        BERT → BART, FR-12/13) followed by a **Key Points** bullet list of the
+        most salient/obligation sentences. spaCy NER (FR-11) runs on the whole
+        document.
         """
         start = time.perf_counter()
         text = _clean_text(text)
-        page_target = int(page_words or PAGE_WORDS)
-        entities = self.extract_entities(text)
-        summary = self._summarize_to_page(text, page_target)
+        src_words = max(1, len(text.split()))
+        target = int(page_words) if page_words else min(
+            max(src_words // SUMMARY_RATIO, MIN_SUMMARY_WORDS), PAGE_WORDS)
+
+        # ~55% of the budget to the overview paragraph, the rest to key points.
+        overview = self._summarize_to_page(text, max(50, int(target * 0.55)))
+        pts_budget = max(40, target - len(overview.split()))
+        points = self._key_points(text, max_points=6, budget=pts_budget)
+        summary = self._format_structured(overview, points)
+        # Key topics: KeyBERT-style phrase ranking relevant to the summary (FR-15).
+        entities = self.extract_keywords(text, reference=summary)
+
         elapsed = round(time.perf_counter() - start, 2)
         return SummaryResult(
             summary_text=summary,
@@ -148,6 +178,72 @@ class AIEngine(NLPPipeline):
             bart_model=self._bart_used or self.bart_model_name,
             processing_seconds=elapsed,
         )
+
+    # ---- structured summary helpers ------------------------------------
+    def _key_points(self, text: str, max_points: int = 6, budget: int = 200) -> list:
+        """Top salient/obligation sentences as concise bullet points (verbatim-ish).
+
+        Enumerated sub-items in one sentence — "(a) … (b) … (c) …" — are split into
+        separate bullets so each requirement gets its own row.
+        """
+        points, words = [], 0
+        for s in self._top_sentences(text, max_points):
+            for piece in self._split_enumerated(s):
+                piece = re.sub(r"\s+", " ", piece).strip()
+                # Trim dangling connectors/punctuation left by the split.
+                piece = re.sub(r"[\s,;]+and[\s,;]*$", "", piece, flags=re.IGNORECASE)
+                piece = piece.strip().strip(",;").strip()
+                if not piece:
+                    continue
+                w = len(piece.split())
+                if words + w > budget and points:
+                    return points
+                points.append(piece)
+                words += w
+        return points
+
+    @staticmethod
+    def _split_enumerated(sentence: str) -> list:
+        """Split "(a) … (b) … (c) …" into separate items; else return as-is."""
+        parts = [p for p in re.split(r"\s*(?=\([a-z0-9]{1,3}\))", sentence) if p.strip()]
+        return parts if len(parts) > 1 else [sentence]
+
+    def _top_sentences(self, text: str, k: int) -> list:
+        """K most central sentences (BERT), boosting obligation sentences, in order."""
+        sentences = self._sentences(text)
+        if not sentences:
+            return []
+        if len(sentences) <= k:
+            return sentences
+
+        candidates = sentences[:80]                 # bound CPU (NFR-02)
+        import torch
+        tok, model = self._load_bert()
+        inputs = tok(candidates, padding=True, truncation=True, max_length=128,
+                     return_tensors="pt")
+        with torch.no_grad():
+            out = model(**inputs)
+        mask = inputs["attention_mask"].unsqueeze(-1).float()
+        emb = (out.last_hidden_state * mask).sum(1) / mask.sum(1).clamp(min=1e-9)
+        emb = torch.nn.functional.normalize(emb, dim=1)
+        doc_emb = torch.nn.functional.normalize(emb.mean(0, keepdim=True), dim=1)
+        scores = (emb @ doc_emb.T).squeeze(1)
+        # Boost obligations/deadlines so requirements surface as key points.
+        boost = torch.tensor([0.12 if _REQUIRE_RE.search(s) else 0.0
+                              for s in candidates])
+        scores = scores + boost
+        top_idx = sorted(torch.topk(scores, k).indices.tolist())  # keep reading order
+        return [candidates[i] for i in top_idx]
+
+    @staticmethod
+    def _format_structured(overview: str, points: list) -> str:
+        """Assemble the Overview + Key Points sections into one structured string."""
+        blocks = []
+        if overview.strip():
+            blocks.append("Overview:\n" + overview.strip())
+        if points:
+            blocks.append("Key Points:\n" + "\n".join(f"- {p}" for p in points))
+        return "\n\n".join(blocks)
 
     def _summarize_to_page(self, text: str, page_target: int, depth: int = 0) -> str:
         """Summarise `text` to ~page_target words (minimum ~page_target).
@@ -211,6 +307,19 @@ class AIEngine(NLPPipeline):
             key = (txt, label)
             if key in seen or not txt:
                 continue
+            # Drop bare numbers/punctuation (e.g. "1", "1.", "2.2", "25") — they
+            # are paragraph labels, not useful keywords. Money/percent/dates keep
+            # their letters or units and survive.
+            if not re.search(r"[A-Za-z]", txt):
+                continue
+            # Reject spaCy's false ORG tags on generic phrases: keep an ORG only
+            # if it names a real body (has an org keyword) or is an abbreviation
+            # (e.g. "SME", "CBSL"). Drops "Aggregate Capital".
+            if label == "ORG":
+                low_t = txt.lower()
+                is_abbr = bool(re.fullmatch(r"[A-Z]{2,6}s?", txt))
+                if not (is_abbr or any(k in low_t for k in _ORG_KEYWORDS)):
+                    continue
             seen.add(key)
             ents.append({"text": txt, "label": label})
         # Regex catch for explicit circular/direction references (FR-11), including
@@ -239,6 +348,87 @@ class AIEngine(NLPPipeline):
             e["_rank"] = (count + boost, -idx)
         ents.sort(key=lambda e: e["_rank"], reverse=True)
         return [{"text": e["text"], "label": e["label"]} for e in ents[:top_n]]
+
+    # ---- keyword extraction (KeyBERT-style), FR-15 --------------------
+    def extract_keywords(self, text: str, top_n: int = 5, reference: str = None) -> list:
+        """Return the top_n most relevant key topics as {text, label}.
+
+        Candidate noun phrases (spaCy) are embedded with BERT and ranked by
+        similarity to the summary (or the document), then diversified with MMR so
+        the tags are relevant AND non-redundant — unlike raw NER, which mislabels
+        and repeats domain terms. Circular numbers are labelled REGULATION; the
+        rest are TOPIC.
+        """
+        clean = _clean_text(text)[:100_000]
+        if not clean.strip():
+            return []
+        nlp = self._load_spacy()
+        doc = nlp(clean)
+
+        cands, seen = [], set()
+        for nc in doc.noun_chunks:
+            toks = [t for t in nc if not (t.is_stop or t.is_punct or t.like_num)]
+            phrase = re.sub(r"\s+", " ", " ".join(t.text for t in toks)).strip(" -–—")
+            words = phrase.split()
+            if not phrase or not (1 <= len(words) <= 4) or len(phrase) < 3:
+                continue
+            if not re.search(r"[A-Za-z]{3,}", phrase):
+                continue
+            low = phrase.lower()
+            if low in seen:                       # case-insensitive dedupe (Bank/BANK)
+                continue
+            seen.add(low)
+            cands.append(phrase)
+            if len(cands) >= 80:                  # bound CPU (NFR-02)
+                break
+        if not cands:
+            return []
+
+        ref = _clean_text(reference)[:3000] if reference else clean[:3000]
+        import torch
+        embs = self._embed(cands)
+        ref_emb = self._embed([ref], max_length=256)
+        sims = (embs @ ref_emb.T).squeeze(1)
+        for i, c in enumerate(cands):
+            if len(c.split()) >= 2:               # prefer specific multi-word topics
+                sims[i] = sims[i] + 0.03
+        idx = self._mmr(embs, sims, top_n, diversity=0.6)
+        return [{"text": cands[i], "label": self._kw_label(cands[i])} for i in idx]
+
+    def _embed(self, texts, max_length: int = 64):
+        """Mean-pooled, L2-normalised BERT embeddings for a list of texts."""
+        import torch
+        tok, model = self._load_bert()
+        inputs = tok(texts, padding=True, truncation=True, max_length=max_length,
+                     return_tensors="pt")
+        with torch.no_grad():
+            out = model(**inputs)
+        mask = inputs["attention_mask"].unsqueeze(-1).float()
+        emb = (out.last_hidden_state * mask).sum(1) / mask.sum(1).clamp(min=1e-9)
+        return torch.nn.functional.normalize(emb, dim=1)
+
+    @staticmethod
+    def _mmr(embs, sims, k, diversity: float = 0.6):
+        """Maximal Marginal Relevance selection: relevant but non-redundant."""
+        n = embs.shape[0]
+        selected, remaining = [], list(range(n))
+        while len(selected) < min(k, n) and remaining:
+            if not selected:
+                best = max(remaining, key=lambda j: sims[j].item())
+            else:
+                best = max(remaining, key=lambda j: (
+                    diversity * sims[j].item()
+                    - (1 - diversity) * max((embs[j] @ embs[s]).item() for s in selected)
+                ))
+            selected.append(best)
+            remaining.remove(best)
+        return selected
+
+    @staticmethod
+    def _kw_label(phrase: str) -> str:
+        if re.search(r"\d+\s*(?:of|/)\s*\d{4}", phrase):
+            return "REGULATION"
+        return "TOPIC"
 
     def classify(self, text: str) -> list:
         """Keyword heuristic for compliance category (used by Phase 4, FR-18)."""

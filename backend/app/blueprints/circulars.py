@@ -435,6 +435,15 @@ def summarize_circular(circular_id):
     circular = Circular.query.get(circular_id)
     if not circular:
         return jsonify({"error": "Circular not found."}), 404
+    # Refresh extracted text from the stored PDF so extraction improvements
+    # (header/footer + table-artifact stripping, OCR) apply on every (re)summarize.
+    if circular.file_path and os.path.exists(circular.file_path):
+        try:
+            fresh, _ = pdf_extract.extract_text_with_meta(circular.file_path)
+            if fresh.strip():
+                circular.extracted_text = fresh
+        except ValueError:
+            pass
     if not (circular.extracted_text or "").strip():
         return jsonify({"error": "Circular has no extracted text to summarize."}), 400
 

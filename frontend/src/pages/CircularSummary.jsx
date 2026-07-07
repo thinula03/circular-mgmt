@@ -4,6 +4,7 @@ import client from "../api/client";
 import EntityTags from "../components/EntityTags.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import ChatPanel from "../components/ChatPanel.jsx";
+import SummaryText from "../components/SummaryText.jsx";
 import Icon from "../components/Icon.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -201,9 +202,9 @@ export default function CircularSummary() {
           <div>
             <h2 className="mb-1 text-sm font-semibold text-ink">AI Summary</h2>
             {summary ? (
-              <p className="rounded-lg bg-ink-surface p-3 text-sm leading-relaxed text-ink">
-                {summary.summary_text}
-              </p>
+              <div className="rounded-lg bg-ink-surface p-3 text-sm">
+                <SummaryText text={summary.summary_text} />
+              </div>
             ) : (
               <p className="text-sm text-ink-muted">No summary generated yet.</p>
             )}
@@ -211,7 +212,7 @@ export default function CircularSummary() {
 
           {summary?.entities?.length > 0 && (
             <div>
-              <div className="mb-1 text-xs font-medium uppercase text-ink-muted">Key entities</div>
+              <div className="mb-1 text-xs font-medium uppercase text-ink-muted">Key topics</div>
               <EntityTags entities={summary.entities} />
             </div>
           )}

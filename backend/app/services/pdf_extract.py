@@ -12,7 +12,9 @@ C:\\Program Files\\Tesseract-OCR\\tesseract.exe).
 """
 import os
 import re
+import math
 import logging
+from collections import Counter
 
 log = logging.getLogger(__name__)
 
@@ -41,7 +43,7 @@ def extract_text_with_meta(file_path: str):
     except Exception as exc:  # corrupt / not a real PDF
         raise ValueError(f"Could not read PDF: {exc}") from exc
 
-    parts = []
+    page_texts = []
     with doc:
         page_count = doc.page_count
         for page in doc:
@@ -50,10 +52,67 @@ def extract_text_with_meta(file_path: str):
                 ocr = _ocr_page(page)
                 # Prefer OCR only when it produced meaningfully more/cleaner text.
                 if ocr and len(ocr.strip()) >= max(_MIN_TEXT_CHARS, len(layer.strip()) * 0.6):
-                    parts.append(ocr)
+                    page_texts.append(ocr)
                     continue
-            parts.append(layer)
-    return "\n".join(parts), page_count
+            page_texts.append(layer)
+    return _strip_repeating(page_texts, page_count), page_count
+
+
+def _norm_line(line: str) -> str:
+    """Normalise a line for repeat-detection: lowercase, drop a trailing page
+    number, collapse whitespace."""
+    s = re.sub(r"\s+", " ", (line or "").strip().lower())
+    s = re.sub(r"\s*\d{1,4}$", "", s).strip()   # trailing page number varies per page
+    return s
+
+
+def _is_junk_marker(s: str) -> bool:
+    """A parenthesised token that is not a valid list label — e.g. '(bo)' from a
+    mangled table cell. Real markers '(a)', '(1)', '(iv)' are kept."""
+    m = re.fullmatch(r"\(([a-z]{2,})\)", s.strip(), re.IGNORECASE)
+    if not m:
+        return False
+    return not re.fullmatch(r"[ivxlcdm]+", m.group(1), re.IGNORECASE)  # keep roman
+
+
+def _clean_line(line: str, boiler: set):
+    """Return a cleaned line, or None to drop it (header/footer, stray table
+    artifact, bare number, junk marker)."""
+    stripped = line.strip()
+    if not stripped:
+        return None
+    if _norm_line(line) in boiler:                       # repeated header/footer
+        return None
+    if re.fullmatch(r"[\d.\s()|-]{1,6}", stripped):      # bare page/section number, lone '|'
+        return None
+    if _is_junk_marker(stripped):                        # e.g. "(bo)"
+        return None
+    cleaned = re.sub(r"\s*\|\s*", " ", line).strip()     # drop table-cell pipes
+    return cleaned or None
+
+
+def _strip_repeating(page_texts, page_count):
+    """Remove page headers/footers (lines recurring across pages) plus stray table
+    artifacts (lone pipes, bare numbers, mangled markers), so they don't pollute
+    summaries and search."""
+    per_page = [[ln.rstrip() for ln in (t or "").split("\n")] for t in page_texts]
+
+    boiler = set()
+    if page_count >= 2:
+        counts = Counter()
+        for lines in per_page:
+            for norm in {_norm_line(ln) for ln in lines if _norm_line(ln)}:
+                counts[norm] += 1
+        threshold = max(2, math.ceil(0.4 * page_count))
+        boiler = {n for n, c in counts.items() if c >= threshold}
+
+    out = []
+    for lines in per_page:
+        for ln in lines:
+            cleaned = _clean_line(ln, boiler)
+            if cleaned:
+                out.append(cleaned)
+    return "\n".join(out)
 
 
 def _needs_ocr(page, layer: str) -> bool:

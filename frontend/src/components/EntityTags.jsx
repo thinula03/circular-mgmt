@@ -7,6 +7,19 @@ const TAG_STYLES = {
   REGULATION: "bg-amber-50 text-status-read",
   ORG: "bg-brand-50 text-brand-700",
   PLACE: "bg-slate-100 text-ink",
+  TOPIC: "bg-brand-50 text-brand-700",
+};
+
+// Readable English labels shown on each tag (instead of raw NER codes).
+const LABEL_TEXT = {
+  DATE: "Date",
+  MONEY: "Amount",
+  NUMBER: "Number",
+  PERCENT: "Percent",
+  REGULATION: "Regulation",
+  ORG: "Organization",
+  PLACE: "Location",
+  TOPIC: "Topic",
 };
 
 export default function EntityTags({ entities = [], limit = 5 }) {
@@ -22,7 +35,7 @@ export default function EntityTags({ entities = [], limit = 5 }) {
           title={e.label}
         >
           {e.text}
-          <span className="ml-1 opacity-60">{e.label}</span>
+          <span className="ml-1 opacity-60">{LABEL_TEXT[e.label] || e.label}</span>
         </span>
       ))}
     </div>

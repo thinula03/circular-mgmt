@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import client from "../api/client";
 import EntityTags from "../components/EntityTags.jsx";
+import SummaryText from "../components/SummaryText.jsx";
 import Icon from "../components/Icon.jsx";
 
 // WF-05 — Administrator upload screen (FR-06–FR-10).
@@ -198,12 +199,12 @@ export default function AdminUpload() {
                     {summary.bart_model} · {summary.word_count} words · {summary.processing_seconds}s
                   </span>
                 </div>
-                <p className="rounded-lg bg-ink-surface p-3 text-sm leading-relaxed text-ink">
-                  {summary.summary_text}
-                </p>
+                <div className="rounded-lg bg-ink-surface p-3 text-sm">
+                  <SummaryText text={summary.summary_text} />
+                </div>
                 <div>
                   <div className="mb-1 text-xs font-medium uppercase text-ink-muted">
-                    Key entities (spaCy NER)
+                    Key topics
                   </div>
                   <EntityTags entities={summary.entities} />
                 </div>
