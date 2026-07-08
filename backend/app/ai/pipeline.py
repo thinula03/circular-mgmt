@@ -198,8 +198,12 @@ class AIEngine(NLPPipeline):
         if not self._llm.available():
             log.info("Ollama not reachable; using BART summariser.")
             return None, None
+        # The LLM prioritises completeness over brevity, so give it a more
+        # generous budget than the extractive path (recall matters for compliance).
+        src = len(text.split())
+        llm_target = min(max(src // 2, 200), 800)
         try:
-            summary = self._llm.summarize(text, target)
+            summary = self._llm.summarize(text, llm_target)
             if summary.strip():
                 return summary, self.config.get("OLLAMA_MODEL", "ollama")
         except Exception as exc:  # noqa: BLE001 — network/model failure
