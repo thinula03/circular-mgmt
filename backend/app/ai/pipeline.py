@@ -13,8 +13,12 @@ inside the loader, not at module import, to keep app startup fast.
 import os
 import re
 import time
+import logging
 
 from .interface import NLPPipeline, SummaryResult
+from .llm_summarizer import LLMSummarizer
+
+log = logging.getLogger(__name__)
 
 # backend/model_cache/hub — where Phase 0 downloaded the Hugging Face models.
 _BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -102,6 +106,7 @@ class AIEngine(NLPPipeline):
         self._bert = None
         self._bart = None
         self._bart_used = None  # records which BART model actually loaded (FR-16)
+        self._llm = None        # local LLM summariser (Ollama), lazy
 
     # ---- lazy model loaders -------------------------------------------
     def _load_spacy(self):
@@ -161,11 +166,16 @@ class AIEngine(NLPPipeline):
         target = int(page_words) if page_words else min(
             max(src_words // SUMMARY_RATIO, MIN_SUMMARY_WORDS), PAGE_WORDS)
 
-        # ~55% of the budget to the overview paragraph, the rest to key points.
-        overview = self._summarize_to_page(text, max(50, int(target * 0.55)))
-        pts_budget = max(40, target - len(overview.split()))
-        points = self._key_points(text, max_points=6, budget=pts_budget)
-        summary = self._format_structured(overview, points)
+        # Preferred: a local instruction-tuned LLM (Ollama) — far more fluent and
+        # coherent than BART. Falls back to the BART pipeline if it's unavailable.
+        summary, model_used = self._llm_summary(text, target)
+        if summary is None:
+            # ~55% of the budget to the overview paragraph, the rest to key points.
+            overview = self._summarize_to_page(text, max(50, int(target * 0.55)))
+            pts_budget = max(40, target - len(overview.split()))
+            points = self._key_points(text, max_points=6, budget=pts_budget)
+            summary = self._format_structured(overview, points)
+            model_used = self._bart_used or self.bart_model_name
         # Key topics: KeyBERT-style phrase ranking relevant to the summary (FR-15).
         entities = self.extract_keywords(text, reference=summary)
 
@@ -175,9 +185,26 @@ class AIEngine(NLPPipeline):
             entities=entities,
             word_count=len(summary.split()),
             bert_model=self.bert_model_name,
-            bart_model=self._bart_used or self.bart_model_name,
+            bart_model=model_used,          # provenance: which model produced it
             processing_seconds=elapsed,
         )
+
+    def _llm_summary(self, text, target):
+        """Try the local LLM; return (summary, model_name) or (None, None)."""
+        if not self.config.get("USE_LLM_SUMMARY", False):
+            return None, None
+        if self._llm is None:
+            self._llm = LLMSummarizer(self.config)
+        if not self._llm.available():
+            log.info("Ollama not reachable; using BART summariser.")
+            return None, None
+        try:
+            summary = self._llm.summarize(text, target)
+            if summary.strip():
+                return summary, self.config.get("OLLAMA_MODEL", "ollama")
+        except Exception as exc:  # noqa: BLE001 — network/model failure
+            log.warning("LLM summary failed (%s); falling back to BART.", exc)
+        return None, None
 
     # ---- structured summary helpers ------------------------------------
     def _key_points(self, text: str, max_points: int = 6, budget: int = 200) -> list:
