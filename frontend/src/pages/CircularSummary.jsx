@@ -5,6 +5,7 @@ import EntityTags from "../components/EntityTags.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import ChatPanel from "../components/ChatPanel.jsx";
 import SummaryText from "../components/SummaryText.jsx";
+import PublishControls from "../components/PublishControls.jsx";
 import Icon from "../components/Icon.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -23,7 +24,6 @@ export default function CircularSummary() {
   const [broadcasting, setBroadcasting] = useState(false);
   const [broadcastMsg, setBroadcastMsg] = useState("");
   const [regenerating, setRegenerating] = useState(false);
-  const [publishingReview, setPublishingReview] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
@@ -67,22 +67,6 @@ export default function CircularSummary() {
       setBroadcastMsg(err.response?.data?.error || "Broadcast failed.");
     } finally {
       setBroadcasting(false);
-    }
-  }
-
-  async function publishReview() {
-    setPublishingReview(true);
-    setBroadcastMsg("");
-    try {
-      const res = await client.post(`/circulars/${id}/publish`);
-      await load();
-      const d = res.data.distribution;
-      setBroadcastMsg(`Published — routed to ${d.departments.join(", ")}, ${
-        d.recipient_count} recipient${d.recipient_count === 1 ? "" : "s"} notified.`);
-    } catch (err) {
-      setBroadcastMsg(err.response?.data?.error || "Publish failed.");
-    } finally {
-      setPublishingReview(false);
     }
   }
 
@@ -154,18 +138,20 @@ export default function CircularSummary() {
         <Link to="/" className="btn-ghost py-1.5 text-xs">← Back to list</Link>
       </div>
 
-      {/* Review banner: unpublished circular awaiting admin publish */}
+      {/* Review banner: unpublished circular awaiting admin classify + publish */}
       {isAdmin && circular.status !== "published" && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
-          <span className="text-ink">
+        <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <span className="block text-sm text-ink">
             <span className="font-semibold text-status-read">Not published.</span>{" "}
-            {summary ? "Review the summary below, then publish to distribute."
+            {summary ? "Pick the category and departments, then publish to distribute."
                      : "Generate a summary from the upload screen, then publish."}
           </span>
           {summary && (
-            <button onClick={publishReview} disabled={publishingReview} className="btn-primary py-1.5 text-xs">
-              {publishingReview ? "Publishing…" : "Publish & distribute"}
-            </button>
+            <PublishControls
+              circularId={circular.id}
+              defaultCategories={(circular.classifications || []).map((c) => c.category)}
+              onPublished={() => { load(); setBroadcastMsg("Published & distributed."); }}
+            />
           )}
         </div>
       )}

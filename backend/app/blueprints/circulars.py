@@ -9,9 +9,9 @@ from werkzeug.utils import secure_filename
 from sqlalchemy import or_
 
 from ..extensions import db
-from ..models.circular import Circular, Summary, Classification
+from ..models.circular import Circular, Summary, Classification, Category
 from ..models.engagement import Acknowledgement, Notification
-from ..models.identity import User, CircularDepartment
+from ..models.identity import User, CircularDepartment, Department
 from ..models.system import ChangeRequest
 from ..services.security import roles_required
 from ..services import audit, pdf_extract, distribution
@@ -20,6 +20,55 @@ from ..ai import get_engine, get_index
 circulars_bp = Blueprint("circulars", __name__)
 
 ALLOWED_EXTENSIONS = {".pdf"}
+
+
+def _ensure_categories():
+    """Seed the managed category taxonomy from the defaults if it's empty."""
+    if Category.query.first() is None:
+        for name in Classification.CATEGORIES:
+            db.session.add(Category(name=name))
+        db.session.commit()
+
+
+@circulars_bp.get("/categories")
+@jwt_required()
+def list_categories():
+    """Managed compliance categories (for the manual classification picker)."""
+    _ensure_categories()
+    return jsonify([c.to_dict() for c in Category.query.order_by(Category.name).all()])
+
+
+@circulars_bp.post("/categories")
+@jwt_required()
+@roles_required("Administrator")
+def add_category():
+    """Administrators extend the taxonomy with a new category."""
+    name = ((request.get_json(silent=True) or {}).get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Category name is required."}), 400
+    if Category.query.filter(Category.name.ilike(name)).first():
+        return jsonify({"error": f"Category '{name}' already exists."}), 409
+    cat = Category(name=name)
+    db.session.add(cat)
+    db.session.commit()
+    audit.record("CATEGORY_ADDED", user_id=int(get_jwt_identity()),
+                 entity_type="Category", entity_id=cat.id, detail=name)
+    return jsonify(cat.to_dict()), 201
+
+
+@circulars_bp.delete("/categories/<int:cat_id>")
+@jwt_required()
+@roles_required("Administrator")
+def delete_category(cat_id):
+    """Administrators remove a category from the taxonomy."""
+    cat = Category.query.get(cat_id)
+    if not cat:
+        return jsonify({"error": "Category not found."}), 404
+    db.session.delete(cat)
+    db.session.commit()
+    audit.record("CATEGORY_DELETED", user_id=int(get_jwt_identity()),
+                 entity_type="Category", entity_id=cat_id, detail=cat.name)
+    return jsonify({"message": f"Category '{cat.name}' deleted."})
 
 
 def _circular_list_item(circular, my_status):
@@ -480,10 +529,8 @@ def summarize_circular(circular_id):
     )
     db.session.add(summary)
 
-    # Auto-classification (FR-18) — refresh AI categories (keep manual overrides).
-    Classification.query.filter_by(circular_id=circular.id, is_manual=False).delete()
-    for c in engine.classify(circular.extracted_text):
-        db.session.add(Classification(circular_id=circular.id, **c))
+    # No auto-classification: categories are assigned manually by an administrator
+    # from the managed taxonomy at publish time (FR-18/20).
 
     # Regenerate keeps the (published) status; a fresh summary goes to review.
     circular.status = prev_status if regenerate else "review"
@@ -524,15 +571,36 @@ def publish_circular(circular_id):
     if circular.status == "published":
         return jsonify({"error": "This circular is already published."}), 400
 
+    data = request.get_json(silent=True) or {}
+    # Manual classification: admin picks categories from the managed taxonomy.
+    categories = data.get("categories")
+    if categories is not None:
+        valid = {c.name for c in Category.query.all()}
+        chosen = [c for c in categories if c in valid]
+        if not chosen:
+            return jsonify({"error": "Select at least one valid category."}), 400
+        Classification.query.filter_by(circular_id=circular.id).delete()
+        for name in chosen:
+            db.session.add(Classification(circular_id=circular.id, category=name,
+                                          confidence=None, is_manual=True))
+
+    # Manual routing: admin picks the departments (overrides auto-routing).
+    department_ids = data.get("department_ids")
+    broadcast = bool(data.get("broadcast", False))
+    if department_ids is not None:
+        department_ids = [int(d) for d in department_ids]
+        if not department_ids and not broadcast:
+            return jsonify({"error": "Select at least one department (or broadcast)."}), 400
+
     # FR-25: acknowledgement deadline (days from now, default 7).
-    ack_days = int(request.args.get("ack_days", 7))
-    broadcast = request.args.get("broadcast", "false").lower() == "true"
+    ack_days = int(data.get("ack_days", request.args.get("ack_days", 7)))
     circular.ack_deadline = datetime.utcnow() + timedelta(days=max(1, ack_days))
     circular.status = "published"
     circular.published_at = circular.published_at or datetime.utcnow()
     db.session.commit()
 
-    dist = distribution.route_and_notify(circular, broadcast=broadcast)
+    dist = distribution.route_and_notify(circular, broadcast=broadcast,
+                                         department_ids=department_ids)
     try:
         get_index(current_app.config).build(
             Circular.query.filter_by(status="published").all())
@@ -558,9 +626,10 @@ def override_classification(circular_id):
         return jsonify({"error": "Circular not found."}), 404
     data = request.get_json(silent=True) or {}
     categories = data.get("categories") or []
-    valid = [c for c in categories if c in Classification.CATEGORIES]
+    allowed = {c.name for c in Category.query.all()}
+    valid = [c for c in categories if c in allowed]
     if not valid:
-        return jsonify({"error": f"Provide categories from {Classification.CATEGORIES}."}), 400
+        return jsonify({"error": "Provide at least one valid category."}), 400
 
     Classification.query.filter_by(circular_id=circular.id).delete()
     for cat in valid:

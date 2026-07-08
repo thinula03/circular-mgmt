@@ -24,30 +24,32 @@ CATEGORY_ROUTING = {
 RECIPIENT_ROLES = ("Employee", "Manager")
 
 
-def route_and_notify(circular, broadcast=False):
+def route_and_notify(circular, broadcast=False, department_ids=None):
     """Route a published circular to departments and notify recipients.
 
-    When `broadcast` is True the circular is sent to ALL departments, overriding
-    category-based routing (used by the "Send to all departments" toggle).
+    Target departments are resolved in priority order:
+      1. `department_ids` — an explicit, admin-chosen list (manual routing);
+      2. `broadcast` True — ALL departments;
+      3. otherwise — category-based routing (CATEGORY_ROUTING), the default.
     Idempotent: re-running re-computes routing and tops up missing
     acknowledgements/notifications without duplicating them.
     Returns {"departments": [...], "recipient_count": n}.
     """
-    categories = [c.category for c in circular.classifications] or ["General"]
-
     # ---- resolve target departments (FR-19) ----
-    codes = set()
-    broadcast_all = broadcast
-    for cat in categories:
-        mapped = CATEGORY_ROUTING.get(cat, [])
-        if not mapped:
-            broadcast_all = True  # "General" goes everywhere
-        codes.update(mapped)
-
-    if broadcast_all or not codes:
+    if broadcast:
         departments = Department.query.all()
-    else:
-        departments = Department.query.filter(Department.code.in_(codes)).all()
+    elif department_ids:                       # explicit manual selection
+        departments = Department.query.filter(Department.id.in_(department_ids)).all()
+    else:                                       # category-based auto-routing
+        categories = [c.category for c in circular.classifications] or ["General"]
+        codes, broadcast_all = set(), False
+        for cat in categories:
+            mapped = CATEGORY_ROUTING.get(cat, [])
+            if not mapped:
+                broadcast_all = True           # "General" goes everywhere
+            codes.update(mapped)
+        departments = (Department.query.all() if broadcast_all or not codes
+                       else Department.query.filter(Department.code.in_(codes)).all())
     dept_ids = [d.id for d in departments]
 
     # ---- record routing in the junction table ----

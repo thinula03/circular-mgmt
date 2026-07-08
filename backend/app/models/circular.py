@@ -115,10 +115,31 @@ class Summary(db.Model):
         }
 
 
+class Category(db.Model):
+    """CATEGORIES — managed compliance-category taxonomy (admin-editable).
+
+    Replaces the hard-coded category list so administrators can add/remove
+    categories, keeping a controlled, reusable taxonomy across circulars.
+    """
+    __tablename__ = "categories"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {"id": self.id, "name": self.name}
+
+
 class Classification(db.Model):
-    """CLASSIFICATIONS — AI and manual compliance categories (FR-18, FR-20)."""
+    """CLASSIFICATIONS — compliance categories assigned to a circular (FR-18, FR-20).
+
+    Categories are assigned manually by an administrator from the managed
+    Category taxonomy; `is_manual` records that (vs any AI suggestion).
+    """
     __tablename__ = "classifications"
 
+    # Seed taxonomy — also used to populate the Category table on first run.
     CATEGORIES = (
         "Technology Risk",
         "Anti-Money Laundering",

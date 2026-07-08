@@ -4,7 +4,7 @@ Importing this package registers every model with SQLAlchemy so that
 `db.create_all()` and Alembic-style migrations see the full schema.
 """
 from .identity import User, Department, CircularDepartment
-from .circular import Circular, Summary, Classification
+from .circular import Circular, Summary, Classification, Category
 from .engagement import Acknowledgement, Notification
 from .system import (AuditLog, ChatLog, ChatConversation, VectorIndexMetadata,
                      ChangeRequest)
@@ -16,6 +16,7 @@ __all__ = [
     "Circular",
     "Summary",
     "Classification",
+    "Category",
     "Acknowledgement",
     "Notification",
     "AuditLog",

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import client from "../api/client";
 import EntityTags from "../components/EntityTags.jsx";
 import SummaryText from "../components/SummaryText.jsx";
+import PublishControls from "../components/PublishControls.jsx";
 import Icon from "../components/Icon.jsx";
 
 // WF-05 — Administrator upload screen (FR-06–FR-10).
@@ -31,10 +32,7 @@ export default function AdminUpload() {
   const [summary, setSummary] = useState(null);
   const [classifications, setClassifications] = useState([]);
   const [distribution, setDistribution] = useState(null);
-  const [ackDays, setAckDays] = useState(7);
-  const [broadcast, setBroadcast] = useState(false);
   const [sumError, setSumError] = useState("");
-  const [publishing, setPublishing] = useState(false);
 
   async function handleSummarize() {
     setSumError("");
@@ -51,23 +49,6 @@ export default function AdminUpload() {
       setSumError(err.response?.data?.error || "Summarization failed.");
     } finally {
       setSummarizing(false);
-    }
-  }
-
-  async function handlePublish() {
-    setSumError("");
-    setPublishing(true);
-    try {
-      const res = await client.post(
-        `/circulars/${result.circular.id}/publish?ack_days=${ackDays}&broadcast=${broadcast}`,
-        {},
-        { timeout: 120000 }
-      );
-      setDistribution(res.data.distribution || null);
-    } catch (err) {
-      setSumError(err.response?.data?.error || "Publish failed.");
-    } finally {
-      setPublishing(false);
     }
   }
 
@@ -209,42 +190,17 @@ export default function AdminUpload() {
                   <EntityTags entities={summary.entities} />
                 </div>
 
-                {/* Review step: choose settings, regenerate, or publish */}
+                {/* Review step: pick category + departments, then publish */}
                 {!distribution ? (
                   <div className="space-y-3 border-t border-ink-line pt-3">
-                    <div className="flex flex-wrap items-end gap-4">
-                      <div>
-                        <label className="mb-1 block text-xs font-medium uppercase text-ink-muted">
-                          Acknowledge within (days)
-                        </label>
-                        <input type="number" min="1" max="90" value={ackDays}
-                          onChange={(e) => setAckDays(Number(e.target.value) || 7)}
-                          className="input w-28" />
-                      </div>
-                      <label className="flex cursor-pointer items-center gap-2 pb-2 text-sm text-ink">
-                        <input type="checkbox" checked={broadcast}
-                          onChange={(e) => setBroadcast(e.target.checked)}
-                          className="h-4 w-4 rounded border-ink-line text-brand-500 focus:ring-brand-400" />
-                        Send to all departments
-                      </label>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button onClick={handlePublish} disabled={publishing} className="btn-primary">
-                        {publishing ? (
-                          <span className="flex items-center gap-2">
-                            <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                            Publishing…
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-2">
-                            <Icon name="check" className="h-4 w-4" /> Publish &amp; distribute
-                          </span>
-                        )}
-                      </button>
-                      <button onClick={handleSummarize} disabled={summarizing} className="btn-ghost">
-                        {summarizing ? "Regenerating…" : "Regenerate summary"}
-                      </button>
-                    </div>
+                    <PublishControls
+                      circularId={result.circular.id}
+                      defaultCategories={classifications.map((c) => c.category)}
+                      onPublished={(d) => setDistribution(d)}
+                    />
+                    <button onClick={handleSummarize} disabled={summarizing} className="btn-ghost">
+                      {summarizing ? "Regenerating…" : "Regenerate summary"}
+                    </button>
                     {sumError && (
                       <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-status-unread">
                         {sumError}
