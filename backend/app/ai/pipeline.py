@@ -202,13 +202,24 @@ class AIEngine(NLPPipeline):
         # generous budget than the extractive path (recall matters for compliance).
         src = len(text.split())
         llm_target = min(max(src // 2, 200), 800)
-        try:
-            summary = self._llm.summarize(text, llm_target)
-            if summary.strip():
+        # Retry once — small models occasionally refuse or return junk.
+        for attempt in range(2):
+            try:
+                summary = self._llm.summarize(text, llm_target)
+            except Exception as exc:  # noqa: BLE001 — network/model failure
+                log.warning("LLM summary failed (%s); falling back to BART.", exc)
+                break
+            if self._valid_summary(summary):
                 return summary, self.config.get("OLLAMA_MODEL", "ollama")
-        except Exception as exc:  # noqa: BLE001 — network/model failure
-            log.warning("LLM summary failed (%s); falling back to BART.", exc)
+            log.info("LLM returned unusable output (attempt %d); retrying.", attempt + 1)
         return None, None
+
+    @staticmethod
+    def _valid_summary(summary):
+        """Reject refusals / junk (e.g. 'I can't fulfill this request')."""
+        if not summary or len(summary.split()) < 25:
+            return False
+        return "overview" in summary.lower() and "key point" in summary.lower()
 
     # ---- structured summary helpers ------------------------------------
     def _key_points(self, text: str, max_points: int = 6, budget: int = 200) -> list:

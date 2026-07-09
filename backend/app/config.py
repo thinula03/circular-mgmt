@@ -52,6 +52,14 @@ class Config:
     OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
     OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
     OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "300"))
+    # Keep the model loaded between summaries (avoids reload cost).
+    OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
+    # Upper bound on context window — lower it on small-VRAM GPUs so more of the
+    # model fits on the GPU (e.g. 6144 for a 2GB card).
+    OLLAMA_MAX_CTX = int(os.getenv("OLLAMA_MAX_CTX", "16384"))
+    # GPU layers to offload: "0" forces full CPU (avoids slow CPU/GPU split on
+    # weak GPUs); unset = let Ollama decide automatically.
+    OLLAMA_NUM_GPU = os.getenv("OLLAMA_NUM_GPU")
 
     # ---- CORS ----
     FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")

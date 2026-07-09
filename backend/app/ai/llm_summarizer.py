@@ -12,6 +12,14 @@ import urllib.request
 
 log = logging.getLogger(__name__)
 
+_SYSTEM_PROMPT = (
+    "You are a professional compliance summarization assistant for a bank. "
+    "You ALWAYS summarize the regulatory circular you are given, in the exact "
+    "format requested. You never refuse, never add disclaimers or warnings, and "
+    "never ask questions. Base the summary strictly and only on the circular's "
+    "content."
+)
+
 
 class LLMSummarizer:
     def __init__(self, config=None):
@@ -19,6 +27,10 @@ class LLMSummarizer:
         self.url = config.get("OLLAMA_URL", "http://localhost:11434").rstrip("/")
         self.model = config.get("OLLAMA_MODEL", "llama3.2:3b")
         self.timeout = int(config.get("OLLAMA_TIMEOUT", 300))
+        self.keep_alive = config.get("OLLAMA_KEEP_ALIVE", "30m")
+        self.max_ctx = int(config.get("OLLAMA_MAX_CTX", 16384))
+        ng = config.get("OLLAMA_NUM_GPU")
+        self.num_gpu = int(ng) if ng not in (None, "") else None  # 0 => full CPU
 
     # ---- availability -------------------------------------------------
     def available(self) -> bool:
@@ -39,14 +51,19 @@ class LLMSummarizer:
             text = " ".join(words)
 
         # Size the context to the document (+room for output) so small circulars
-        # stay fast and large ones are still read in full.
+        # stay fast and large ones are still read in full. Capped by OLLAMA_MAX_CTX
+        # (lower it on small-VRAM GPUs to keep more layers on the GPU).
         need = int(len(words) * 1.4) + 1800
-        num_ctx = min(16384, max(4096, need))
+        num_ctx = min(self.max_ctx, max(4096, need))
 
         payload = {
             "model": self.model,
-            "prompt": self._build_prompt(text, target_words),
+            "messages": [
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": self._build_prompt(text, target_words)},
+            ],
             "stream": False,
+            "keep_alive": self.keep_alive,
             "options": {
                 "temperature": 0.2,
                 "top_p": 0.9,
@@ -54,14 +71,16 @@ class LLMSummarizer:
                 "num_predict": 1500,   # allow a longer, complete summary
             },
         }
+        if self.num_gpu is not None:      # 0 forces full CPU
+            payload["options"]["num_gpu"] = self.num_gpu
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(
-            f"{self.url}/api/generate", data=data,
+            f"{self.url}/api/chat", data=data,
             headers={"Content-Type": "application/json"},
         )
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
             out = json.loads(resp.read().decode("utf-8"))
-        return self._normalise(out.get("response", "").strip())
+        return self._normalise((out.get("message") or {}).get("content", "").strip())
 
     @staticmethod
     def _build_prompt(text: str, target_words: int) -> str:
@@ -106,6 +125,11 @@ class LLMSummarizer:
             i = resp.find(marker)
             if i != -1:
                 resp = resp[:i].strip()
+        # Convert markdown bold section headers ("**Overview**") to "Overview:".
+        resp = re.sub(r"(?im)^\s*\*\*\s*(Overview|Key Points?)\s*\*\*\s*:?\s*$",
+                      lambda m: m.group(1).strip() + ":", resp)
         # Normalise bullet markers (*, •) to "-" so the UI renders them as a list.
         resp = re.sub(r"(?m)^\s*[*•]\s+", "- ", resp)
+        # Drop any remaining markdown bold markers.
+        resp = resp.replace("**", "")
         return resp
