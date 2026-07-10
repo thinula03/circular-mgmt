@@ -49,6 +49,8 @@ class Config:
     # When enabled and Ollama is reachable, summaries use a local instruction
     # LLM (far more fluent than BART); otherwise the pipeline falls back to BART.
     USE_LLM_SUMMARY = os.getenv("USE_LLM_SUMMARY", "true").lower() == "true"
+    # Generate grounded RAG chatbot answers with the local LLM (vs extractive).
+    USE_LLM_CHAT = os.getenv("USE_LLM_CHAT", "true").lower() == "true"
     OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
     OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
     OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "300"))

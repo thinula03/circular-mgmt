@@ -42,7 +42,32 @@ class ChatbotService:
     def __init__(self, vector_index: VectorIndex, config=None):
         self.index = vector_index
         self.config = config or {}
-        self._qa = None   # lazily-loaded extractive QA pipeline (or False if absent)
+        self._qa = None    # lazily-loaded extractive QA pipeline (or False if absent)
+        self._llm = None   # lazily-loaded local LLM (or False if disabled)
+
+    # ---- grounded LLM answer generation --------------------------------
+    def _get_llm(self):
+        """Return the local LLM client if enabled, else False."""
+        if self._llm is None:
+            if not self.config.get("USE_LLM_CHAT", False):
+                self._llm = False
+            else:
+                from .llm_summarizer import LLMSummarizer
+                self._llm = LLMSummarizer(self.config)
+        return self._llm
+
+    def _llm_answer(self, question, results):
+        """Generate a grounded answer from retrieved chunks; None to fall back."""
+        llm = self._get_llm()
+        if not llm or not llm.available():
+            return None
+        context = "\n\n".join(f"[{r['circular_number']}] {r['text']}" for r in results[:7])
+        try:
+            ans = llm.answer(question, context)
+        except Exception as exc:  # noqa: BLE001 — network/model failure
+            log.warning("LLM chat failed (%s); using extractive answer.", exc)
+            return None
+        return ans if ans and len(ans.split()) >= 2 else None
 
     # ---- optional extractive QA reader ---------------------------------
     def _load_qa(self):
@@ -188,7 +213,13 @@ class ChatbotService:
                 "citations": [],
             }
 
-        # Preferred path: an extractive QA reader pinpoints the answer span with a
+        # Preferred path: the local LLM generates a fluent, grounded answer from
+        # the retrieved chunks. Falls back to extractive methods if unavailable.
+        llm_ans = self._llm_answer(question, results)
+        if llm_ans is not None:
+            return {"answer": llm_ans, "citations": self._citations(results[0], results)}
+
+        # Next: an extractive QA reader pinpoints the answer span with a
         # confidence score. If unavailable/low-confidence, fall back to semantic
         # passage extraction below.
         qa = self._qa_answer(question, results)

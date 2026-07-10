@@ -20,6 +20,13 @@ _SYSTEM_PROMPT = (
     "content."
 )
 
+_QA_SYSTEM_PROMPT = (
+    "You are a helpful assistant that answers bank staff questions about "
+    "regulatory circulars. Answer using ONLY the provided context. If the answer "
+    "is not in the context, say you could not find it in the circulars. Be "
+    "concise and accurate, never invent information, and never refuse."
+)
+
 
 class LLMSummarizer:
     def __init__(self, config=None):
@@ -55,20 +62,39 @@ class LLMSummarizer:
         # (lower it on small-VRAM GPUs to keep more layers on the GPU).
         need = int(len(words) * 1.4) + 1800
         num_ctx = min(self.max_ctx, max(4096, need))
+        content = self._chat(_SYSTEM_PROMPT, self._build_prompt(text, target_words),
+                             num_ctx=num_ctx, num_predict=1500)
+        return self._normalise(content)
 
+    # ---- RAG answer generation ----------------------------------------
+    def answer(self, question: str, context: str) -> str:
+        """Answer a question grounded ONLY in the retrieved circular context."""
+        words = context.split()
+        if len(words) > 6000:
+            context = " ".join(words[:6000])
+        num_ctx = min(self.max_ctx, max(2048, int(len(context.split()) * 1.4) + 1100))
+        ans = self._chat(_QA_SYSTEM_PROMPT,
+                         self._build_qa_prompt(question, context),
+                         num_ctx=num_ctx, num_predict=900).strip()
+        ans = ans.replace("**", "")                       # drop markdown bold
+        ans = re.sub(r"(?m)^\s*[*•]\s+", "- ", ans)       # normalise bullets
+        return ans
+
+    # ---- shared Ollama chat call --------------------------------------
+    def _chat(self, system: str, user: str, num_ctx: int, num_predict: int) -> str:
         payload = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": self._build_prompt(text, target_words)},
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
             ],
             "stream": False,
             "keep_alive": self.keep_alive,
             "options": {
                 "temperature": 0.2,
                 "top_p": 0.9,
-                "num_ctx": num_ctx,    # read the whole circular
-                "num_predict": 1500,   # allow a longer, complete summary
+                "num_ctx": num_ctx,
+                "num_predict": num_predict,
             },
         }
         if self.num_gpu is not None:      # 0 forces full CPU
@@ -80,7 +106,34 @@ class LLMSummarizer:
         )
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
             out = json.loads(resp.read().decode("utf-8"))
-        return self._normalise((out.get("message") or {}).get("content", "").strip())
+        return (out.get("message") or {}).get("content", "").strip()
+
+    @staticmethod
+    def _build_qa_prompt(question: str, context: str) -> str:
+        return (
+            "Answer the question using ONLY the context from bank circulars below.\n\n"
+            f"CONTEXT:\n{context}\n\n"
+            f"QUESTION: {question}\n\n"
+            "Rules:\n"
+            "- Use only the context. Answer with whatever relevant information the "
+            "context contains, summarised in your own words. Only if there is NO "
+            'relevant information at all, reply exactly: "I could not find that in the '
+            'circulars."\n'
+            "- Do NOT apologise and do NOT add notes about details you could not find "
+            "(e.g. never write '(I could not find the specific details...)'). Just give "
+            "the available information directly.\n"
+            "- If the circular explains the answer in detail (conditions, requirements, "
+            "standards, steps or sub-points), include those details using bullet points "
+            "and keep exact figures, dates and defined terms. If only brief or partial "
+            "information is available, give that briefly.\n"
+            "- If the question is about a form, application form, annexure, checklist, "
+            "template or attachment, confirm that it is included in the circular (name "
+            "the annexure if known) and tell the user to download or preview the "
+            "circular to access it. Do NOT try to reproduce the form fields.\n"
+            "- Do not mention the word context or that you were given passages.\n"
+            "- Do not refuse and do not add disclaimers.\n\n"
+            "Answer:"
+        )
 
     @staticmethod
     def _build_prompt(text: str, target_words: int) -> str:

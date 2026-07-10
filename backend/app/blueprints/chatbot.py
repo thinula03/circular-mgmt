@@ -59,7 +59,7 @@ def ask():
         index.build(Circular.query.filter_by(status="published").all())
 
     chatbot = get_chatbot(current_app.config)
-    result = chatbot.answer(question, top_k=5, circular_id=circular_id)
+    result = chatbot.answer(question, top_k=8, circular_id=circular_id)
 
     # FR-39: persist the Q/A pair to the conversation.
     log = ChatLog(user_id=uid, conversation_id=conv.id, question=question,
