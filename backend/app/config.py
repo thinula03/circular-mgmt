@@ -53,6 +53,9 @@ class Config:
     USE_LLM_CHAT = os.getenv("USE_LLM_CHAT", "true").lower() == "true"
     OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
     OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+    # A smaller model for interactive chat (speed over depth). Falls back to
+    # OLLAMA_MODEL if unset — e.g. set to "llama3.2:1b" for faster replies.
+    OLLAMA_CHAT_MODEL = os.getenv("OLLAMA_CHAT_MODEL", "")
     OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "300"))
     # Keep the model loaded between summaries (avoids reload cost).
     OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
@@ -62,6 +65,9 @@ class Config:
     # GPU layers to offload: "0" forces full CPU (avoids slow CPU/GPU split on
     # weak GPUs); unset = let Ollama decide automatically.
     OLLAMA_NUM_GPU = os.getenv("OLLAMA_NUM_GPU")
+    # Same, but for chat: "0" = full CPU (often faster than a split on weak GPUs),
+    # unset = auto-place. Lets you benchmark chat independently of summaries.
+    OLLAMA_CHAT_NUM_GPU = os.getenv("OLLAMA_CHAT_NUM_GPU")
 
     # ---- CORS ----
     FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")

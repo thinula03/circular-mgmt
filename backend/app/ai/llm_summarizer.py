@@ -33,11 +33,16 @@ class LLMSummarizer:
         config = config or {}
         self.url = config.get("OLLAMA_URL", "http://localhost:11434").rstrip("/")
         self.model = config.get("OLLAMA_MODEL", "llama3.2:3b")
+        # Optional lighter model for chat; defaults to the summary model.
+        self.chat_model = config.get("OLLAMA_CHAT_MODEL") or self.model
         self.timeout = int(config.get("OLLAMA_TIMEOUT", 300))
         self.keep_alive = config.get("OLLAMA_KEEP_ALIVE", "30m")
         self.max_ctx = int(config.get("OLLAMA_MAX_CTX", 16384))
         ng = config.get("OLLAMA_NUM_GPU")
         self.num_gpu = int(ng) if ng not in (None, "") else None  # 0 => full CPU
+        cng = config.get("OLLAMA_CHAT_NUM_GPU")
+        # None => auto-place chat model; 0 => full CPU for chat.
+        self.chat_num_gpu = int(cng) if cng not in (None, "") else None
 
     # ---- availability -------------------------------------------------
     def available(self) -> bool:
@@ -73,17 +78,46 @@ class LLMSummarizer:
         if len(words) > 6000:
             context = " ".join(words[:6000])
         num_ctx = min(self.max_ctx, max(2048, int(len(context.split()) * 1.4) + 1100))
+        # chat_num_gpu: None auto-places the chat model; 0 forces full CPU (often
+        # faster than a CPU/GPU split on weak GPUs). Independent of summaries.
         ans = self._chat(_QA_SYSTEM_PROMPT,
                          self._build_qa_prompt(question, context),
-                         num_ctx=num_ctx, num_predict=900).strip()
+                         num_ctx=num_ctx, num_predict=900,
+                         model=self.chat_model, num_gpu=self.chat_num_gpu).strip()
         ans = ans.replace("**", "")                       # drop markdown bold
         ans = re.sub(r"(?m)^\s*[*•]\s+", "- ", ans)       # normalise bullets
         return ans
 
+    def refine_query(self, question: str) -> str:
+        """Fix typos / split words into a clean retrieval query (keeps domain terms)."""
+        prompt = (
+            "Rewrite the question below into a clean search query for finding text "
+            "in bank circulars. Fix spelling mistakes and join split words (e.g. "
+            "'applicatio n' -> 'application'). Keep banking terms and abbreviations "
+            "(AML, KYC, PFCA, SME, CRIB, etc.) unchanged. Return ONLY the rewritten "
+            "query, nothing else.\n\n"
+            f"Question: {question}\nSearch query:"
+        )
+        try:
+            out = self._chat(
+                "You rewrite user questions into clean search queries. Return only "
+                "the query text.",
+                prompt, num_ctx=1024, num_predict=40,
+                model=self.chat_model, num_gpu=self.chat_num_gpu).strip()
+        except Exception:  # noqa: BLE001
+            return question
+        out = (out.splitlines() or [""])[0].strip().strip('"').strip()
+        # Guard against the model rambling or returning nothing usable.
+        if not out or len(out.split()) > 25:
+            return question
+        return out
+
     # ---- shared Ollama chat call --------------------------------------
-    def _chat(self, system: str, user: str, num_ctx: int, num_predict: int) -> str:
+    def _chat(self, system: str, user: str, num_ctx: int, num_predict: int,
+              model: str = None, num_gpu="inherit") -> str:
+        ng = self.num_gpu if num_gpu == "inherit" else num_gpu
         payload = {
-            "model": self.model,
+            "model": model or self.model,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -97,8 +131,8 @@ class LLMSummarizer:
                 "num_predict": num_predict,
             },
         }
-        if self.num_gpu is not None:      # 0 forces full CPU
-            payload["options"]["num_gpu"] = self.num_gpu
+        if ng is not None:      # 0 forces full CPU; None lets Ollama auto-place
+            payload["options"]["num_gpu"] = ng
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(
             f"{self.url}/api/chat", data=data,

@@ -204,8 +204,21 @@ class ChatbotService:
 
     # ---- public API ----------------------------------------------------
     def answer(self, question: str, top_k: int = 5, circular_id=None) -> dict:
+        # Clean the query (fix typos / split words) before retrieval so a
+        # misspelling like "applicatio n" doesn't pull irrelevant chunks. The
+        # original question is still used when generating the answer.
+        search_q = question
+        llm = self._get_llm()
+        if llm and llm.available():
+            try:
+                search_q = llm.refine_query(question)
+                if search_q != question:
+                    log.debug("Query refined: %r -> %r", question, search_q)
+            except Exception:  # noqa: BLE001
+                search_q = question
+
         # circular_id scopes retrieval to a single circular (per-circular chat).
-        results = self.index.search(question, top_k=top_k, circular_id=circular_id)   # FR-37
+        results = self.index.search(search_q, top_k=top_k, circular_id=circular_id)   # FR-37
         if not results:
             return {
                 "answer": ("I couldn't find a relevant circular for that question. "
