@@ -26,3 +26,7 @@ faiss-cpu==1.8.0         # FR-37 FAISS vector index
 
 # ===== Utilities =====
 numpy==1.26.4
+
+# ===== Evaluation (thesis metrics; used by eval_summary.py / eval_rag.py) =====
+# rouge-score==0.1.2      # ROUGE-1/2/L
+# bert-score==0.3.13      # semantic BERTScore (downloads a model on first use)

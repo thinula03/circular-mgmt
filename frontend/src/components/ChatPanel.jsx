@@ -28,6 +28,7 @@ export default function ChatPanel({ circularId = null }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);      // awaiting an answer
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [maximized, setMaximized] = useState(false);
   const scrollRef = useRef(null);
 
   const params = scoped ? { circular_id: circularId } : {};
@@ -113,8 +114,10 @@ export default function ChatPanel({ circularId = null }) {
     }
   }
 
-  return (
-    <section className="card flex h-[32rem] flex-col p-0">
+  const panel = (
+    <section className={maximized
+      ? "card flex h-full w-full flex-col p-0"
+      : "card flex h-[32rem] flex-col p-0"}>
       {/* Header */}
       <div className="flex items-center justify-between border-b border-ink-line px-4 py-3">
         <span className="text-sm font-semibold text-ink">
@@ -136,6 +139,13 @@ export default function ChatPanel({ circularId = null }) {
             title="New chat"
           >
             <Icon name="plus" className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setMaximized((m) => !m)}
+            className="grid h-8 w-8 place-items-center rounded-lg border border-ink-line text-ink hover:bg-ink-surface"
+            title={maximized ? "Minimize" : "Maximize"}
+          >
+            <Icon name={maximized ? "minimize" : "expand"} className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -235,4 +245,19 @@ export default function ChatPanel({ circularId = null }) {
       </form>
     </section>
   );
+
+  // Maximized: render the panel in a large centered overlay.
+  if (maximized) {
+    return (
+      <div
+        className="fixed inset-0 z-40 grid place-items-center bg-black/40 p-4"
+        onClick={() => setMaximized(false)}
+      >
+        <div className="h-[88vh] w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
+          {panel}
+        </div>
+      </div>
+    );
+  }
+  return panel;
 }
