@@ -58,7 +58,10 @@ def run():
         employee = User(username="employee", email="employee@bank.lk",
                         full_name="Branch Employee", password_hash=pw,
                         role="Employee", department_id=ops.id)
-        db.session.add_all([admin, manager, employee])
+        officer = User(username="officer", email="officer@bank.lk",
+                       full_name="Compliance Officer", password_hash=pw,
+                       role="Compliance Officer", department_id=compliance.id)
+        db.session.add_all([admin, manager, employee, officer])
         db.session.flush()
 
         # ---- sample circular (fully processed) ----

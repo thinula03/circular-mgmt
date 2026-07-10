@@ -16,6 +16,7 @@ export default function CircularSummary() {
   const { id } = useParams();
   const { user } = useAuth();
   const isAdmin = user?.role === "Administrator";
+  const isOfficer = user?.role === "Compliance Officer";
   const isStaff = isAdmin || user?.role === "Manager";
   const [circular, setCircular] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -67,6 +68,32 @@ export default function CircularSummary() {
       setBroadcastMsg(err.response?.data?.error || "Broadcast failed.");
     } finally {
       setBroadcasting(false);
+    }
+  }
+
+  async function approve() {
+    setBroadcastMsg("");
+    try {
+      const res = await client.post(`/circulars/${id}/approve`, {}, { timeout: 60000 });
+      await load();
+      const d = res.data.distribution;
+      setBroadcastMsg(`Approved & published — ${d.recipient_count} recipient${
+        d.recipient_count === 1 ? "" : "s"} notified.`);
+    } catch (err) {
+      setBroadcastMsg(err.response?.data?.error || "Approve failed.");
+    }
+  }
+
+  async function reject() {
+    const reason = window.prompt("Reason for rejection (sent to the submitter):");
+    if (!reason || !reason.trim()) return;
+    setBroadcastMsg("");
+    try {
+      await client.post(`/circulars/${id}/reject`, { reason: reason.trim() });
+      await load();
+      setBroadcastMsg("Circular sent back for revision.");
+    } catch (err) {
+      setBroadcastMsg(err.response?.data?.error || "Reject failed.");
     }
   }
 
@@ -138,20 +165,37 @@ export default function CircularSummary() {
         <Link to="/" className="btn-ghost py-1.5 text-xs">← Back to list</Link>
       </div>
 
-      {/* Review banner: unpublished circular awaiting admin classify + publish */}
-      {isAdmin && circular.status !== "published" && (
+      {/* Admin: submit a reviewed circular for Compliance Officer approval */}
+      {isAdmin && (circular.status === "review" || circular.status === "uploaded") && (
         <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
           <span className="block text-sm text-ink">
             <span className="font-semibold text-status-read">Not published.</span>{" "}
-            {summary ? "Pick the category and departments, then publish to distribute."
-                     : "Generate a summary from the upload screen, then publish."}
+            {summary ? "Pick the category and departments, then submit for approval."
+                     : "Generate a summary from the upload screen, then submit."}
           </span>
           {summary && (
             <PublishControls
               circularId={circular.id}
               defaultCategories={(circular.classifications || []).map((c) => c.category)}
-              onPublished={() => { load(); setBroadcastMsg("Published & distributed."); }}
+              onSubmitted={() => { load(); setBroadcastMsg("Submitted for approval."); }}
             />
+          )}
+        </div>
+      )}
+
+      {/* Pending approval banner */}
+      {circular.status === "pending_approval" && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm">
+          <span className="text-ink">
+            <span className="font-semibold text-blue-700">Pending approval.</span>{" "}
+            {isOfficer ? "Review the summary below, then approve or reject."
+                       : "Awaiting Compliance Officer approval."}
+          </span>
+          {isOfficer && (
+            <div className="flex gap-2">
+              <button onClick={approve} className="btn-primary py-1.5 text-xs">Approve &amp; publish</button>
+              <button onClick={reject} className="btn-ghost py-1.5 text-xs text-status-unread">Reject</button>
+            </div>
           )}
         </div>
       )}

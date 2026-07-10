@@ -4,7 +4,7 @@ import client from "../api/client";
 // Manual classification + routing before publishing a circular (FR-18/19/20).
 // Admin picks categories (from the managed taxonomy, can add new) and exactly
 // which departments receive it, then publishes & distributes.
-export default function PublishControls({ circularId, defaultCategories = [], onPublished }) {
+export default function PublishControls({ circularId, defaultCategories = [], onSubmitted }) {
   const [categories, setCategories] = useState([]);   // managed taxonomy
   const [depts, setDepts] = useState([]);
   const [selCats, setSelCats] = useState(() => new Set(defaultCategories));
@@ -40,7 +40,7 @@ export default function PublishControls({ circularId, defaultCategories = [], on
     }
   }
 
-  async function publish() {
+  async function submit() {
     setErr("");
     if (selCats.size === 0) return setErr("Select at least one category.");
     if (!broadcast && selDepts.size === 0) return setErr("Select departments, or choose broadcast.");
@@ -48,10 +48,10 @@ export default function PublishControls({ circularId, defaultCategories = [], on
     try {
       const body = { categories: [...selCats], ack_days: ackDays, broadcast };
       if (!broadcast) body.department_ids = [...selDepts];
-      const { data } = await client.post(`/circulars/${circularId}/publish`, body, { timeout: 120000 });
-      onPublished?.(data.distribution);
+      const { data } = await client.post(`/circulars/${circularId}/submit`, body, { timeout: 60000 });
+      onSubmitted?.(data);
     } catch (e) {
-      setErr(e.response?.data?.error || "Publish failed.");
+      setErr(e.response?.data?.error || "Submit failed.");
     } finally {
       setBusy(false);
     }
@@ -114,8 +114,8 @@ export default function PublishControls({ circularId, defaultCategories = [], on
           <input type="number" min="1" max="90" value={ackDays}
             onChange={(e) => setAckDays(Number(e.target.value) || 7)} className="input w-28" />
         </div>
-        <button onClick={publish} disabled={busy} className="btn-primary">
-          {busy ? "Publishing…" : "Publish & distribute"}
+        <button onClick={submit} disabled={busy} className="btn-primary">
+          {busy ? "Submitting…" : "Submit for approval"}
         </button>
       </div>
 

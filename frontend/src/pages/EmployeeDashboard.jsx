@@ -27,6 +27,7 @@ const PRIORITY_STYLE = {
 const LIFECYCLE_STYLE = {
   published: "bg-green-50 text-status-ack",
   processing: "bg-blue-50 text-blue-700",
+  pending_approval: "bg-blue-50 text-blue-700",
   review: "bg-amber-50 text-status-read",
   uploaded: "bg-amber-50 text-status-read",
   failed: "bg-red-50 text-status-unread",

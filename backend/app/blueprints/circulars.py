@@ -555,45 +555,14 @@ def summarize_circular(circular_id):
     })
 
 
-@circulars_bp.post("/<int:circular_id>/publish")
-@jwt_required()
-@roles_required("Administrator")
-def publish_circular(circular_id):
-    """Publish a reviewed circular: set the deadline, distribute + notify, index.
+def _finalize_publish(circular):
+    """Publish a circular using its stored distribution intent: set the deadline,
+    distribute + notify, and rebuild the index. Returns the distribution result."""
+    intent = circular.distribution_intent or {}
+    department_ids = intent.get("department_ids")
+    broadcast = bool(intent.get("broadcast", False))
+    ack_days = int(intent.get("ack_days", 7))
 
-    Separated from /summarize so an administrator can review the AI summary first.
-    """
-    circular = Circular.query.get(circular_id)
-    if not circular:
-        return jsonify({"error": "Circular not found."}), 404
-    if not circular.summary:
-        return jsonify({"error": "Generate a summary before publishing."}), 400
-    if circular.status == "published":
-        return jsonify({"error": "This circular is already published."}), 400
-
-    data = request.get_json(silent=True) or {}
-    # Manual classification: admin picks categories from the managed taxonomy.
-    categories = data.get("categories")
-    if categories is not None:
-        valid = {c.name for c in Category.query.all()}
-        chosen = [c for c in categories if c in valid]
-        if not chosen:
-            return jsonify({"error": "Select at least one valid category."}), 400
-        Classification.query.filter_by(circular_id=circular.id).delete()
-        for name in chosen:
-            db.session.add(Classification(circular_id=circular.id, category=name,
-                                          confidence=None, is_manual=True))
-
-    # Manual routing: admin picks the departments (overrides auto-routing).
-    department_ids = data.get("department_ids")
-    broadcast = bool(data.get("broadcast", False))
-    if department_ids is not None:
-        department_ids = [int(d) for d in department_ids]
-        if not department_ids and not broadcast:
-            return jsonify({"error": "Select at least one department (or broadcast)."}), 400
-
-    # FR-25: acknowledgement deadline (days from now, default 7).
-    ack_days = int(data.get("ack_days", request.args.get("ack_days", 7)))
     circular.ack_deadline = datetime.utcnow() + timedelta(days=max(1, ack_days))
     circular.status = "published"
     circular.published_at = circular.published_at or datetime.utcnow()
@@ -606,14 +575,134 @@ def publish_circular(circular_id):
             Circular.query.filter_by(status="published").all())
     except Exception:  # noqa: BLE001 — indexing failure shouldn't fail publishing
         pass
+    return dist
 
-    audit.record("CIRCULAR_PUBLISHED", user_id=int(get_jwt_identity()),
-                 entity_type="Circular", entity_id=circular.id,
-                 detail=f"{dist['recipient_count']} recipients")
-    return jsonify({
-        "circular": circular.to_dict(),
-        "distribution": dist,
-    })
+
+@circulars_bp.post("/<int:circular_id>/submit")
+@jwt_required()
+@roles_required("Administrator")
+def submit_for_approval(circular_id):
+    """Maker step: an admin submits a reviewed circular (with its category and
+    target departments) to a Compliance Officer for approval. Nothing is
+    distributed yet."""
+    circular = Circular.query.get(circular_id)
+    if not circular:
+        return jsonify({"error": "Circular not found."}), 404
+    if not circular.summary:
+        return jsonify({"error": "Generate a summary before submitting."}), 400
+    if circular.status == "published":
+        return jsonify({"error": "This circular is already published."}), 400
+
+    data = request.get_json(silent=True) or {}
+    # Manual classification (required): categories from the managed taxonomy.
+    valid = {c.name for c in Category.query.all()}
+    chosen = [c for c in (data.get("categories") or []) if c in valid]
+    if not chosen:
+        return jsonify({"error": "Select at least one valid category."}), 400
+    Classification.query.filter_by(circular_id=circular.id).delete()
+    for name in chosen:
+        db.session.add(Classification(circular_id=circular.id, category=name,
+                                      confidence=None, is_manual=True))
+
+    # Target departments (the distribution intent, applied on approval).
+    department_ids = data.get("department_ids")
+    broadcast = bool(data.get("broadcast", False))
+    department_ids = [int(d) for d in department_ids] if department_ids else []
+    if not broadcast and not department_ids:
+        return jsonify({"error": "Select at least one department (or broadcast)."}), 400
+    circular.distribution_intent = {
+        "department_ids": department_ids,
+        "broadcast": broadcast,
+        "ack_days": int(data.get("ack_days", 7)),
+    }
+    circular.status = "pending_approval"
+    db.session.commit()
+
+    # Notify all Compliance Officers that something awaits approval.
+    submitter = User.query.get(int(get_jwt_identity()))
+    note = (f"Circular {circular.circular_number} submitted for approval"
+            + (f" by {submitter.full_name}" if submitter else "") + ".")
+    for officer in User.query.filter_by(role="Compliance Officer", is_active=True).all():
+        db.session.add(Notification(user_id=officer.id, circular_id=circular.id,
+                                    message=note, link="/approvals"))
+    db.session.commit()
+    audit.record("CIRCULAR_SUBMITTED", user_id=int(get_jwt_identity()),
+                 entity_type="Circular", entity_id=circular.id)
+    return jsonify({"circular": circular.to_dict(),
+                    "message": "Submitted for Compliance Officer approval."})
+
+
+@circulars_bp.post("/<int:circular_id>/approve")
+@jwt_required()
+@roles_required("Compliance Officer")
+def approve_circular(circular_id):
+    """Checker step: a Compliance Officer approves a pending circular, which
+    publishes and distributes it."""
+    circular = Circular.query.get(circular_id)
+    if not circular:
+        return jsonify({"error": "Circular not found."}), 404
+    if circular.status != "pending_approval":
+        return jsonify({"error": "This circular is not pending approval."}), 400
+
+    uid = int(get_jwt_identity())
+    circular.approved_by = uid
+    circular.approved_at = datetime.utcnow()
+    dist = _finalize_publish(circular)
+
+    approver = User.query.get(uid)
+    if circular.uploaded_by:
+        db.session.add(Notification(
+            user_id=circular.uploaded_by, circular_id=circular.id,
+            message=(f"Your circular {circular.circular_number} was approved and "
+                     f"published by {approver.full_name}."),
+            link=f"/circulars/{circular.id}"))
+        db.session.commit()
+    audit.record("CIRCULAR_APPROVED", user_id=uid, entity_type="Circular",
+                 entity_id=circular.id, detail=f"{dist['recipient_count']} recipients")
+    return jsonify({"circular": circular.to_dict(), "distribution": dist})
+
+
+@circulars_bp.post("/<int:circular_id>/reject")
+@jwt_required()
+@roles_required("Compliance Officer")
+def reject_circular(circular_id):
+    """Checker step: a Compliance Officer rejects a pending circular with a reason,
+    sending it back to the admin for revision."""
+    circular = Circular.query.get(circular_id)
+    if not circular:
+        return jsonify({"error": "Circular not found."}), 404
+    if circular.status != "pending_approval":
+        return jsonify({"error": "This circular is not pending approval."}), 400
+    reason = ((request.get_json(silent=True) or {}).get("reason") or "").strip()
+    if not reason:
+        return jsonify({"error": "Please provide a reason for rejection."}), 400
+
+    circular.status = "review"
+    db.session.commit()
+    approver = User.query.get(int(get_jwt_identity()))
+    if circular.uploaded_by:
+        db.session.add(Notification(
+            user_id=circular.uploaded_by, circular_id=circular.id,
+            message=(f"Your circular {circular.circular_number} was rejected by "
+                     f"{approver.full_name}: {reason}"),
+            link=f"/circulars/{circular.id}"))
+        db.session.commit()
+    audit.record("CIRCULAR_REJECTED", user_id=int(get_jwt_identity()),
+                 entity_type="Circular", entity_id=circular.id, detail=reason[:200])
+    return jsonify({"circular": circular.to_dict(),
+                    "message": "Circular sent back for revision."})
+
+
+@circulars_bp.get("/pending")
+@jwt_required()
+@roles_required("Compliance Officer", "Administrator")
+def list_pending():
+    """The approval queue: circulars awaiting Compliance Officer approval."""
+    rows = (Circular.query.filter_by(status="pending_approval")
+            .order_by(Circular.created_at.desc()).all())
+    return jsonify([{**c.to_dict(),
+                     "categories": [cl.category for cl in c.classifications],
+                     "has_summary": c.summary is not None} for c in rows])
 
 
 @circulars_bp.patch("/<int:circular_id>/classification")

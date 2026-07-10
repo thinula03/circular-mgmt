@@ -7,7 +7,8 @@ class Circular(db.Model):
     """CIRCULARS — PDF metadata, extracted text, lifecycle status."""
     __tablename__ = "circulars"
 
-    STATUSES = ("uploaded", "processing", "review", "published", "failed")
+    STATUSES = ("uploaded", "processing", "review", "pending_approval",
+                "published", "failed")
     PRIORITIES = ("High", "Medium", "Low")
 
     id = db.Column(db.Integer, primary_key=True)
@@ -23,6 +24,11 @@ class Circular(db.Model):
     uploaded_by = db.Column(db.Integer, db.ForeignKey("users.id"))
     # The earlier circular this one amends (self-reference). NULL for most.
     amends_circular_id = db.Column(db.Integer, db.ForeignKey("circulars.id"))
+    # Four-eyes approval (maker-checker): who approved, when, and the pending
+    # distribution intent (departments/broadcast/ack_days) chosen at submit time.
+    approved_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+    approved_at = db.Column(db.DateTime)
+    distribution_intent = db.Column(db.JSON)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     published_at = db.Column(db.DateTime)
 
@@ -67,6 +73,8 @@ class Circular(db.Model):
             "amends": self._ref(self.amends),
             "amended_by": self._ref(self.latest_amender),
             "is_superseded": self.is_superseded,
+            "approved_by": self.approved_by,
+            "approved_at": self.approved_at.isoformat() if self.approved_at else None,
         }
         if include_text:
             data["extracted_text"] = self.extracted_text

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import client from "../api/client";
 
 // Admin user management (FR-02 roles, FR-05 department assignment).
-const ROLES = ["Employee", "Manager", "Administrator"];
+const ROLES = ["Employee", "Manager", "Compliance Officer", "Administrator"];
 const EMPTY_FORM = {
   username: "",
   email: "",

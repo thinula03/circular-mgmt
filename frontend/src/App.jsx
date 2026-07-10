@@ -10,6 +10,7 @@ import ManagerDashboard from "./pages/ManagerDashboard.jsx";
 import AdminUpload from "./pages/AdminUpload.jsx";
 import Users from "./pages/Users.jsx";
 import Requests from "./pages/Requests.jsx";
+import Approvals from "./pages/Approvals.jsx";
 
 // Guard a route: require a session, and optionally a set of roles (RBAC, NFR-07).
 function Protected({ children, roles }) {
@@ -43,6 +44,15 @@ export default function App() {
           element={
             <Protected roles={["Manager", "Administrator"]}>
               <ManagerDashboard />
+            </Protected>
+          }
+        />
+        {/* Approval queue — Compliance Officers (and admins) */}
+        <Route
+          path="/approvals"
+          element={
+            <Protected roles={["Compliance Officer", "Administrator"]}>
+              <Approvals />
             </Protected>
           }
         />

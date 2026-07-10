@@ -7,7 +7,8 @@ import Icon from "./Icon.jsx";
 
 // Role-aware navigation: links shown depend on the user's role (RBAC).
 const NAV = [
-  { to: "/", label: "Circulars", icon: "document", roles: ["Employee", "Manager", "Administrator"] },
+  { to: "/", label: "Circulars", icon: "document", roles: ["Employee", "Manager", "Administrator", "Compliance Officer"] },
+  { to: "/approvals", label: "Approvals", icon: "check", roles: ["Compliance Officer", "Administrator"] },
   { to: "/compliance", label: "Compliance", icon: "chart", roles: ["Manager", "Administrator"] },
   { to: "/requests", label: "Requests", icon: "inbox", roles: ["Manager", "Administrator"] },
   { to: "/upload", label: "Upload", icon: "upload", roles: ["Administrator"] },

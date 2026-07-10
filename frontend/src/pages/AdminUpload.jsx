@@ -31,7 +31,7 @@ export default function AdminUpload() {
   const [summarizing, setSummarizing] = useState(false);
   const [summary, setSummary] = useState(null);
   const [classifications, setClassifications] = useState([]);
-  const [distribution, setDistribution] = useState(null);
+  const [submitted, setSubmitted] = useState(false);
   const [sumError, setSumError] = useState("");
 
   async function handleSummarize() {
@@ -99,7 +99,7 @@ export default function AdminUpload() {
     setStatus("idle");
     setSummary(null);
     setClassifications([]);
-    setDistribution(null);
+    setSubmitted(false);
     setSumError("");
     if (fileInput.current) fileInput.current.value = "";
   }
@@ -168,8 +168,8 @@ export default function AdminUpload() {
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold text-ink">AI Summary</span>
-                  {!distribution && (
-                    <span className="badge bg-amber-50 text-status-read">Draft — review before publishing</span>
+                  {!submitted && (
+                    <span className="badge bg-amber-50 text-status-read">Draft — review before submitting</span>
                   )}
                   {classifications.map((c) => (
                     <span key={c.id || c.category} className="badge bg-brand-50 text-brand-700">
@@ -190,13 +190,13 @@ export default function AdminUpload() {
                   <EntityTags entities={summary.entities} />
                 </div>
 
-                {/* Review step: pick category + departments, then publish */}
-                {!distribution ? (
+                {/* Review step: pick category + departments, then submit for approval */}
+                {!submitted ? (
                   <div className="space-y-3 border-t border-ink-line pt-3">
                     <PublishControls
                       circularId={result.circular.id}
                       defaultCategories={classifications.map((c) => c.category)}
-                      onPublished={(d) => setDistribution(d)}
+                      onSubmitted={() => setSubmitted(true)}
                     />
                     <button onClick={handleSummarize} disabled={summarizing} className="btn-ghost">
                       {summarizing ? "Regenerating…" : "Regenerate summary"}
@@ -209,13 +209,9 @@ export default function AdminUpload() {
                   </div>
                 ) : (
                   <div className="rounded-lg border border-ink-line bg-ink-surface p-3 text-sm">
-                    <span className="font-semibold text-ink">Published &amp; distributed.</span>{" "}
-                    Routed to{" "}
-                    <span className="font-medium text-brand-700">
-                      {distribution.departments.join(", ")}
-                    </span>{" "}
-                    — {distribution.recipient_count} recipient
-                    {distribution.recipient_count === 1 ? "" : "s"} notified.
+                    <span className="font-semibold text-ink">Submitted for approval.</span>{" "}
+                    A Compliance Officer will review and publish it. You'll be notified
+                    of the outcome.
                   </div>
                 )}
               </div>

@@ -112,6 +112,26 @@ class LLMSummarizer:
             return question
         return out
 
+    def keywords(self, text: str, n: int = 5) -> list:
+        """Extract the n most important key terms/topics from a summary."""
+        prompt = (
+            f"From the bank circular summary below, list the {n} most important key "
+            "terms or topics (short noun phrases, 1-4 words each) that capture what "
+            "the circular is about. Return ONLY a comma-separated list — no numbering, "
+            "no explanations, no extra text.\n\n"
+            f"SUMMARY:\n{text}"
+        )
+        out = self._chat(
+            "You extract key terms. Return only a comma-separated list of terms.",
+            prompt, num_ctx=2048, num_predict=80,
+            model=self.chat_model, num_gpu=self.chat_num_gpu).strip()
+        terms = []
+        for part in re.split(r"[,\n]", out):
+            p = re.sub(r"^\s*\d+[.)]\s*", "", part).strip().strip('"').strip("-•* ").strip()
+            if p and 1 <= len(p.split()) <= 5 and re.search(r"[A-Za-z]", p):
+                terms.append(p)
+        return terms[:n]
+
     # ---- shared Ollama chat call --------------------------------------
     def _chat(self, system: str, user: str, num_ctx: int, num_predict: int,
               model: str = None, num_gpu="inherit") -> str:

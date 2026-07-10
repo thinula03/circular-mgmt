@@ -176,8 +176,9 @@ class AIEngine(NLPPipeline):
             points = self._key_points(text, max_points=6, budget=pts_budget)
             summary = self._format_structured(overview, points)
             model_used = self._bart_used or self.bart_model_name
-        # Key topics: KeyBERT-style phrase ranking relevant to the summary (FR-15).
-        entities = self.extract_keywords(text, reference=summary)
+        # Key topics: prefer LLM-extracted terms; fall back to KeyBERT-style
+        # phrase ranking relevant to the summary (FR-15).
+        entities = self._llm_keywords(summary) or self.extract_keywords(text, reference=summary)
 
         elapsed = round(time.perf_counter() - start, 2)
         return SummaryResult(
@@ -220,6 +221,23 @@ class AIEngine(NLPPipeline):
         if not summary or len(summary.split()) < 25:
             return False
         return "overview" in summary.lower() and "key point" in summary.lower()
+
+    def _llm_keywords(self, summary):
+        """LLM-extracted key terms as [{text, label}], or None to fall back."""
+        if not self.config.get("USE_LLM_SUMMARY", False):
+            return None
+        if self._llm is None:
+            self._llm = LLMSummarizer(self.config)
+        if not self._llm.available():
+            return None
+        try:
+            terms = self._llm.keywords(summary, n=5)
+        except Exception as exc:  # noqa: BLE001 — network/model failure
+            log.warning("LLM keyword extraction failed (%s); using KeyBERT.", exc)
+            return None
+        if not terms:
+            return None
+        return [{"text": t, "label": self._kw_label(t)} for t in terms]
 
     # ---- structured summary helpers ------------------------------------
     def _key_points(self, text: str, max_points: int = 6, budget: int = 200) -> list:
