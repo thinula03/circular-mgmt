@@ -199,10 +199,10 @@ class AIEngine(NLPPipeline):
         if not self._llm.available():
             log.info("Ollama not reachable; using BART summariser.")
             return None, None
-        # The LLM prioritises completeness over brevity, so give it a more
-        # generous budget than the extractive path (recall matters for compliance).
+        # Summary length drives generation time on CPU, so keep it to ~1/3 of the
+        # source capped at ~450 words — enough for coverage, much faster than 800.
         src = len(text.split())
-        llm_target = min(max(src // 2, 200), 800)
+        llm_target = min(max(src // 3, 150), 450)
         # Retry once — small models occasionally refuse or return junk.
         for attempt in range(2):
             try:

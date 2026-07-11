@@ -25,6 +25,9 @@ export default function CircularSummary() {
   const [broadcasting, setBroadcasting] = useState(false);
   const [broadcastMsg, setBroadcastMsg] = useState("");
   const [regenerating, setRegenerating] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectBusy, setRejectBusy] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
@@ -84,16 +87,20 @@ export default function CircularSummary() {
     }
   }
 
-  async function reject() {
-    const reason = window.prompt("Reason for rejection (sent to the submitter):");
-    if (!reason || !reason.trim()) return;
+  async function submitReject() {
+    if (!rejectReason.trim()) return;
+    setRejectBusy(true);
     setBroadcastMsg("");
     try {
-      await client.post(`/circulars/${id}/reject`, { reason: reason.trim() });
+      await client.post(`/circulars/${id}/reject`, { reason: rejectReason.trim() });
+      setRejecting(false);
+      setRejectReason("");
       await load();
       setBroadcastMsg("Circular sent back for revision.");
     } catch (err) {
       setBroadcastMsg(err.response?.data?.error || "Reject failed.");
+    } finally {
+      setRejectBusy(false);
     }
   }
 
@@ -101,7 +108,7 @@ export default function CircularSummary() {
     setRegenerating(true);
     setBroadcastMsg("");
     try {
-      await client.post(`/circulars/${id}/summarize?regenerate=true`, {}, { timeout: 600000 });
+      await client.post(`/circulars/${id}/summarize?regenerate=true`, {}, { timeout: 1200000 });
       await load();
       setBroadcastMsg("Summary re-generated.");
     } catch (err) {
@@ -194,7 +201,7 @@ export default function CircularSummary() {
           {isOfficer && (
             <div className="flex gap-2">
               <button onClick={approve} className="btn-primary py-1.5 text-xs">Approve &amp; publish</button>
-              <button onClick={reject} className="btn-ghost py-1.5 text-xs text-status-unread">Reject</button>
+              <button onClick={() => setRejecting(true)} className="btn-ghost py-1.5 text-xs text-status-unread">Reject</button>
             </div>
           )}
         </div>
@@ -329,6 +336,44 @@ export default function CircularSummary() {
               title="Circular PDF preview"
               className="min-h-0 flex-1 rounded-lg border border-ink-line"
             />
+          </div>
+        </div>
+      )}
+
+      {/* Reject dialog — Compliance Officer must give a reason */}
+      {rejecting && (
+        <div
+          className="fixed inset-0 z-40 grid place-items-center bg-black/40 p-4"
+          onClick={() => !rejectBusy && setRejecting(false)}
+        >
+          <div className="card w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="mb-1 text-lg font-bold text-ink">Reject circular</h2>
+            <p className="mb-3 text-sm text-ink-muted">
+              Explain why. The reason is sent to the submitter so they can revise it.
+            </p>
+            <textarea
+              className="input h-28"
+              placeholder="e.g. The summary misses the attendance/clock-in requirement…"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              autoFocus
+            />
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                onClick={() => setRejecting(false)}
+                disabled={rejectBusy}
+                className="btn-ghost"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitReject}
+                disabled={rejectBusy || !rejectReason.trim()}
+                className="btn-primary bg-status-unread hover:bg-status-unread"
+              >
+                {rejectBusy ? "Rejecting…" : "Reject & send back"}
+              </button>
+            </div>
           </div>
         </div>
       )}

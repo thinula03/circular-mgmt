@@ -56,7 +56,7 @@ class Config:
     # A smaller model for interactive chat (speed over depth). Falls back to
     # OLLAMA_MODEL if unset — e.g. set to "llama3.2:1b" for faster replies.
     OLLAMA_CHAT_MODEL = os.getenv("OLLAMA_CHAT_MODEL", "")
-    OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "300"))
+    OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "900"))  # 15 min for slow CPUs
     # Keep the model loaded between summaries (avoids reload cost).
     OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
     # Upper bound on context window — lower it on small-VRAM GPUs so more of the

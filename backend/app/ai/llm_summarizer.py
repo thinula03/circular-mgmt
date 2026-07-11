@@ -67,8 +67,9 @@ class LLMSummarizer:
         # (lower it on small-VRAM GPUs to keep more layers on the GPU).
         need = int(len(words) * 1.4) + 1800
         num_ctx = min(self.max_ctx, max(4096, need))
+        # num_predict caps output tokens (the main CPU cost). ~900 ≈ 600 words max.
         content = self._chat(_SYSTEM_PROMPT, self._build_prompt(text, target_words),
-                             num_ctx=num_ctx, num_predict=1500)
+                             num_ctx=num_ctx, num_predict=900)
         return self._normalise(content)
 
     # ---- RAG answer generation ----------------------------------------
@@ -193,28 +194,26 @@ class LLMSummarizer:
     def _build_prompt(text: str, target_words: int) -> str:
         return (
             "You are a banking compliance analyst. Read the regulatory circular "
-            "below and write a thorough summary for bank staff.\n\n"
+            "below and write a CONCISE summary for bank staff.\n\n"
             'CIRCULAR TEXT:\n"""' + text + '"""\n\n'
             "Rules:\n"
             "- Use ONLY information stated in the circular. Do not add, assume, or invent anything.\n"
             "- Preserve exact figures, dates, deadlines, amounts and defined terms.\n"
-            "- Focus on what people must DO: application and approval procedures, "
-            "obligations, responsibilities, eligibility conditions, entitlements and "
-            "deadlines. Do NOT list definitions or glossary terms.\n"
-            "- Be COMPREHENSIVE: capture EVERY such key point across the WHOLE circular "
-            "(including sections near the end). It is better to include a point than to "
-            "omit it — do not skip important points.\n"
+            "- Focus on what people must DO: key obligations, procedures, eligibility, "
+            "entitlements and deadlines. Do NOT list definitions or glossary terms.\n"
+            "- Be CONCISE: give only the MOST important points. Consolidate related "
+            "details into one bullet and OMIT minor procedural detail and long "
+            "checklists (summarise them in a phrase instead of listing every item).\n"
             "- Do NOT repeat, quote, or paste the circular text back.\n"
             "- Be clear and grammatical.\n"
-            f"- Aim for roughly {target_words}-{target_words * 2} words; use as many "
-            "key-point bullets as the circular needs (do not limit to a few).\n\n"
+            f"- Keep the whole summary to about {target_words} words, with roughly "
+            "6-10 key-point bullets (not more).\n\n"
             "Write ONLY the following two sections, and nothing after them:\n\n"
             "Overview:\n"
-            "<3-5 sentence plain-English overview of what the circular is about>\n\n"
+            "<2-3 sentence plain-English overview of what the circular is about>\n\n"
             "Key Points:\n"
             "- <a key requirement, action, eligibility rule, procedure or deadline>\n"
-            "- <next point>\n"
-            "- <continue with one bullet for every important point in the circular>"
+            "- <next most important point>"
         )
 
     @staticmethod

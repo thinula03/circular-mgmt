@@ -41,7 +41,7 @@ export default function AdminUpload() {
       const res = await client.post(
         `/circulars/${result.circular.id}/summarize`,
         {},
-        { timeout: 600000 } // 1-page map-reduce on CPU can take several minutes
+        { timeout: 1200000 } // LLM summarization on CPU can take several minutes
       );
       setSummary(res.data.summary);
       setClassifications(res.data.classifications || []);
