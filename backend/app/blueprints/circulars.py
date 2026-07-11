@@ -12,7 +12,7 @@ from ..extensions import db
 from ..models.circular import Circular, Summary, Classification, Category
 from ..models.engagement import Acknowledgement, Notification
 from ..models.identity import User, CircularDepartment, Department
-from ..models.system import ChangeRequest
+from ..models.system import ChangeRequest, AuditLog
 from ..services.security import roles_required
 from ..services import audit, pdf_extract, distribution
 from ..ai import get_engine, get_index
@@ -502,7 +502,9 @@ def summarize_circular(circular_id):
     # regenerate=true: refresh the summary of an already-published circular only.
     regenerate = request.args.get("regenerate", "false").lower() == "true"
 
-    prev_status = circular.status
+    # Sanitize so a stuck "processing"/"failed" state can't trap the circular:
+    # a regenerate returns to published (if it was live) else review.
+    prev_status = "published" if circular.status == "published" else "review"
     circular.status = "processing"  # FR-17 status the UI can show
     db.session.commit()
 
@@ -691,6 +693,39 @@ def reject_circular(circular_id):
                  entity_type="Circular", entity_id=circular.id, detail=reason[:200])
     return jsonify({"circular": circular.to_dict(),
                     "message": "Circular sent back for revision."})
+
+
+@circulars_bp.get("/approval-history")
+@jwt_required()
+@roles_required("Compliance Officer", "Administrator")
+def approval_history():
+    """The four-eyes trail: submit / approve / reject events, most recent first."""
+    _ACTIONS = {
+        "CIRCULAR_SUBMITTED": "Submitted",
+        "CIRCULAR_APPROVED": "Approved",
+        "CIRCULAR_REJECTED": "Rejected",
+    }
+    actor = db.aliased(User)
+    rows = (db.session.query(AuditLog, Circular, actor)
+            .outerjoin(Circular, Circular.id == AuditLog.entity_id)
+            .outerjoin(actor, actor.id == AuditLog.user_id)
+            .filter(AuditLog.entity_type == "Circular",
+                    AuditLog.action.in_(list(_ACTIONS)))
+            .order_by(AuditLog.created_at.desc())
+            .limit(100).all())
+    return jsonify([
+        {
+            "id": log.id,
+            "action": _ACTIONS.get(log.action, log.action),
+            "actor": act.full_name if act else "—",
+            "circular_id": circ.id if circ else log.entity_id,
+            "circular_number": circ.circular_number if circ else None,
+            "circular_title": circ.title if circ else None,
+            "detail": log.detail,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        }
+        for log, circ, act in rows
+    ])
 
 
 @circulars_bp.get("/pending")

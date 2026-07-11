@@ -34,10 +34,14 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["Inter", "Segoe UI", "system-ui", "sans-serif"],
+        sans: ['"Segoe UI"', "system-ui", "-apple-system", "Roboto", "Helvetica", "Arial", "sans-serif"],
       },
       boxShadow: {
-        card: "0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04)",
+        card: "0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.06)",
+        lift: "0 10px 30px rgba(15, 23, 42, 0.10)",
+      },
+      backgroundImage: {
+        "brand-gradient": "linear-gradient(165deg, #0e7c7b 0%, #084f4e 55%, #063a3a 100%)",
       },
     },
   },

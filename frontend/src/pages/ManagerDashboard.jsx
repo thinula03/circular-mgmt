@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import client from "../api/client";
 import BarChart from "../components/BarChart.jsx";
+import Icon from "../components/Icon.jsx";
 
 // WF-04 — Manager compliance dashboard (FR-31–35).
 const TONE = {
@@ -44,10 +45,10 @@ export default function ManagerDashboard() {
 
   const kpis = overview
     ? [
-        { label: "Published", value: overview.published, tone: "brand" },
-        { label: "Acknowledged", value: overview.acknowledged, tone: "ack" },
-        { label: "Pending", value: overview.pending, tone: "read" },
-        { label: "Overdue", value: overview.overdue, tone: "unread" },
+        { label: "Published", value: overview.published, tone: "brand", icon: "document", chip: "bg-brand-50 text-brand-600" },
+        { label: "Acknowledged", value: overview.acknowledged, tone: "ack", icon: "check", chip: "bg-green-50 text-status-ack" },
+        { label: "Pending", value: overview.pending, tone: "read", icon: "inbox", chip: "bg-amber-50 text-status-read" },
+        { label: "Overdue", value: overview.overdue, tone: "unread", icon: "bell", chip: "bg-red-50 text-status-unread" },
       ]
     : [];
 
@@ -56,7 +57,7 @@ export default function ManagerDashboard() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-brand-600">WF-04</div>
-          <h1 className="text-xl font-bold text-ink">Compliance Dashboard</h1>
+          <h1 className="text-xl font-bold text-ink">Dashboard</h1>
         </div>
         <div className="flex gap-2">
           <button onClick={() => exportReport("csv")} className="btn-ghost">Export CSV</button>
@@ -67,9 +68,14 @@ export default function ManagerDashboard() {
       {/* KPI cards (FR-31) */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((k) => (
-          <div key={k.label} className="card p-5">
-            <div className="text-xs font-medium uppercase text-ink-muted">{k.label}</div>
-            <div className={`mt-2 text-3xl font-bold ${TONE[k.tone]}`}>{k.value}</div>
+          <div key={k.label} className="card card-hover flex items-center gap-4 p-5">
+            <div className={`grid h-12 w-12 place-items-center rounded-xl ${k.chip}`}>
+              <Icon name={k.icon} className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-ink-muted">{k.label}</div>
+              <div className={`text-2xl font-bold leading-tight ${TONE[k.tone]}`}>{k.value}</div>
+            </div>
           </div>
         ))}
       </div>
@@ -105,12 +111,12 @@ export default function ManagerDashboard() {
       <div className="card p-6">
         <h2 className="mb-3 text-sm font-semibold text-ink">Compliance by department</h2>
         <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase text-ink-muted">
-            <tr><th className="py-2">Department</th><th>Acknowledged</th><th>Pending</th><th>Overdue</th><th>Rate</th></tr>
+          <thead className="border-b border-ink-line text-left text-xs uppercase tracking-wide text-ink-muted">
+            <tr><th className="py-2 font-medium">Department</th><th className="font-medium">Acknowledged</th><th className="font-medium">Pending</th><th className="font-medium">Overdue</th><th className="font-medium">Rate</th></tr>
           </thead>
           <tbody className="divide-y divide-ink-line">
             {(overview?.by_department || []).map((d) => (
-              <tr key={d.department}>
+              <tr key={d.department} className="hover:bg-ink-surface/60">
                 <td className="py-2 font-medium text-ink">{d.department}</td>
                 <td className="text-status-ack">{d.acknowledged}/{d.total}</td>
                 <td>{d.pending}</td>
@@ -126,8 +132,8 @@ export default function ManagerDashboard() {
       <div className="card p-6">
         <h2 className="mb-3 text-sm font-semibold text-ink">Circular compliance</h2>
         <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase text-ink-muted">
-            <tr><th className="py-2">Circular</th><th>Acknowledged</th><th>Overdue</th><th>Rate</th><th /></tr>
+          <thead className="border-b border-ink-line text-left text-xs uppercase tracking-wide text-ink-muted">
+            <tr><th className="py-2 font-medium">Circular</th><th className="font-medium">Acknowledged</th><th className="font-medium">Overdue</th><th className="font-medium">Rate</th><th /></tr>
           </thead>
           <tbody className="divide-y divide-ink-line">
             {circulars.map((c) => (

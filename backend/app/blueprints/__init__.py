@@ -6,6 +6,7 @@ from .summaries import summaries_bp
 from .dashboard import dashboard_bp
 from .chatbot import chatbot_bp
 from .notifications import notifications_bp
+from .audit import audit_bp
 
 ALL_BLUEPRINTS = (
     (auth_bp, "/api/auth"),
@@ -15,4 +16,5 @@ ALL_BLUEPRINTS = (
     (dashboard_bp, "/api/dashboard"),
     (chatbot_bp, "/api/chatbot"),
     (notifications_bp, "/api/notifications"),
+    (audit_bp, "/api/audit"),
 )

@@ -11,6 +11,7 @@ import AdminUpload from "./pages/AdminUpload.jsx";
 import Users from "./pages/Users.jsx";
 import Requests from "./pages/Requests.jsx";
 import Approvals from "./pages/Approvals.jsx";
+import AuditLog from "./pages/AuditLog.jsx";
 
 // Guard a route: require a session, and optionally a set of roles (RBAC, NFR-07).
 function Protected({ children, roles }) {
@@ -40,7 +41,7 @@ export default function App() {
         <Route path="/circulars/:id" element={<CircularSummary />} />
         {/* WF-04 — manager compliance dashboard */}
         <Route
-          path="/compliance"
+          path="/dashboard"
           element={
             <Protected roles={["Manager", "Administrator"]}>
               <ManagerDashboard />
@@ -71,6 +72,15 @@ export default function App() {
           element={
             <Protected roles={["Administrator"]}>
               <AdminUpload />
+            </Protected>
+          }
+        />
+        {/* Admin — audit log viewer */}
+        <Route
+          path="/audit"
+          element={
+            <Protected roles={["Administrator"]}>
+              <AuditLog />
             </Protected>
           }
         />

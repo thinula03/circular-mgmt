@@ -35,18 +35,20 @@ export default function Login() {
   }
 
   return (
-    <div className="grid min-h-screen place-items-center bg-gradient-to-br from-brand-700 to-brand-900 p-4">
-      <div className="card w-full max-w-md p-8">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-xl bg-brand-50">
-            <Icon name="bank" className="h-6 w-6 text-brand-600" />
+    <div className="relative grid min-h-screen place-items-center overflow-hidden bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 p-4">
+      {/* light decorative rings (no blur — stays smooth on low-end GPUs) */}
+      <div className="pointer-events-none absolute -left-20 -top-20 h-72 w-72 rounded-full border border-white/10" />
+      <div className="pointer-events-none absolute -bottom-24 -right-16 h-96 w-96 rounded-full border border-white/10" />
+
+      <div className="relative w-full max-w-md rounded-2xl border border-ink-line bg-white p-8 shadow-2xl">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <div className="mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 shadow-md ring-1 ring-white/30">
+            <Icon name="bank" className="h-7 w-7 text-white" />
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-ink">Circular Hub</h1>
-            <p className="text-xs text-ink-muted">
-              Smart Circular Summarization &amp; Management System
-            </p>
-          </div>
+          <h1 className="text-xl font-bold tracking-tight text-ink">Circular Hub</h1>
+          <p className="mt-1 text-xs text-ink-muted">
+            Smart Circular Summarization &amp; Management System
+          </p>
         </div>
 
         {notice && (

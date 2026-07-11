@@ -27,6 +27,11 @@ def login():
 
     user = User.query.filter_by(username=username, is_active=True).first()
     if not user or not verify_password(password, user.password_hash):
+        # Security signal: record failed attempts (no valid user_id if unknown).
+        audit.record("USER_LOGIN_FAILED",
+                     user_id=user.id if user else None,
+                     entity_type="User", entity_id=user.id if user else None,
+                     detail=f"username={username}")
         return jsonify({"error": "Invalid username or password"}), 401
 
     user.last_login = datetime.utcnow()
@@ -38,6 +43,15 @@ def login():
         additional_claims={"role": user.role, "username": user.username},
     )
     return jsonify({"access_token": token, "user": user.to_dict()})
+
+
+@auth_bp.post("/logout")
+@jwt_required()
+def logout():
+    """Record a logout event (JWT is stateless; the client discards the token)."""
+    uid = int(get_jwt_identity())
+    audit.record("USER_LOGOUT", user_id=uid, entity_type="User", entity_id=uid)
+    return jsonify({"message": "Logged out."})
 
 
 @auth_bp.get("/me")

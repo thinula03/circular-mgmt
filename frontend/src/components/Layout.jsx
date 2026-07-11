@@ -9,10 +9,11 @@ import Icon from "./Icon.jsx";
 const NAV = [
   { to: "/", label: "Circulars", icon: "document", roles: ["Employee", "Manager", "Administrator", "Compliance Officer"] },
   { to: "/approvals", label: "Approvals", icon: "check", roles: ["Compliance Officer", "Administrator"] },
-  { to: "/compliance", label: "Compliance", icon: "chart", roles: ["Manager", "Administrator"] },
+  { to: "/dashboard", label: "Dashboard", icon: "chart", roles: ["Manager", "Administrator"] },
   { to: "/requests", label: "Requests", icon: "inbox", roles: ["Manager", "Administrator"] },
   { to: "/upload", label: "Upload", icon: "upload", roles: ["Administrator"] },
   { to: "/users", label: "Users", icon: "users", roles: ["Administrator"] },
+  { to: "/audit", label: "Audit Log", icon: "history", roles: ["Administrator"] },
 ];
 
 export default function Layout() {
@@ -36,49 +37,60 @@ export default function Layout() {
   return (
     <div className="flex h-full min-h-screen">
       {/* Sidebar */}
-      <aside className="hidden w-64 flex-shrink-0 flex-col bg-brand-700 text-white md:flex">
-        <div className="flex items-center gap-2 px-5 py-5">
-          <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/15">
+      <aside className="hidden w-64 flex-shrink-0 flex-col bg-gradient-to-b from-brand-700 to-brand-900 text-white shadow-xl md:flex">
+        <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/15 shadow-inner ring-1 ring-white/20">
             <Icon name="bank" className="h-5 w-5 text-white" />
           </div>
           <div className="leading-tight">
-            <div className="text-sm font-semibold">Circular Hub</div>
+            <div className="text-sm font-bold tracking-tight">Circular Hub</div>
             <div className="text-[11px] text-brand-100">CBSL Compliance</div>
           </div>
         </div>
-        <nav className="mt-2 flex flex-col gap-1 px-3">
+        <nav className="mt-4 flex flex-col gap-1 px-3">
           {links.map((l) => (
             <NavLink
               key={l.to}
               to={l.to}
               end={l.to === "/"}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${
+                `group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all ${
                   isActive
-                    ? "bg-white/15 font-semibold text-white"
-                    : "text-brand-100 hover:bg-white/10"
+                    ? "bg-white/15 font-semibold text-white shadow-sm"
+                    : "text-brand-100 hover:bg-white/10 hover:text-white"
                 }`
               }
             >
-              <Icon name={l.icon} className="h-5 w-5" />
-              {l.label}
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={`absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-white transition-opacity ${
+                      isActive ? "opacity-100" : "opacity-0"
+                    }`}
+                  />
+                  <Icon name={l.icon} className="h-5 w-5" />
+                  {l.label}
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
-        <div className="mt-auto px-5 py-4 text-[11px] text-brand-100">
+        <div className="mt-auto px-5 py-4 text-[11px] leading-relaxed text-brand-100/80">
           Smart Circular Summarization &amp; Management System
         </div>
       </aside>
 
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-ink-line bg-white px-6 py-3">
+        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-ink-line bg-white px-6 py-3 shadow-sm">
           <div className="text-sm text-ink-muted">
             Welcome, <span className="font-semibold text-ink">{user?.full_name}</span>
           </div>
           <div className="flex items-center gap-3">
             <NotificationBell />
-            <span className="badge bg-brand-50 text-brand-700">{user?.role}</span>
+            <span className="badge bg-brand-50 font-semibold text-brand-700 ring-1 ring-brand-100">
+              {user?.role}
+            </span>
             <button onClick={handleLogout} className="btn-ghost py-1.5 text-xs">
               Sign out
             </button>

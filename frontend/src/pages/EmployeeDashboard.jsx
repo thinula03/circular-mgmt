@@ -134,6 +134,11 @@ export default function EmployeeDashboard() {
           <h1 className="text-xl font-bold text-ink">
             {isStaff ? "All Circulars" : "My Circulars"}
           </h1>
+          {!loading && (
+            <p className="mt-0.5 text-sm text-ink-muted">
+              {items.length} circular{items.length === 1 ? "" : "s"}
+            </p>
+          )}
         </div>
         <form
           onSubmit={(e) => { e.preventDefault(); load(); }}

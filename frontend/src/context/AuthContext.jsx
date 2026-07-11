@@ -18,6 +18,8 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
+    // Best-effort logout event for the audit trail (token is still valid here).
+    client.post("/auth/logout").catch(() => {});
     localStorage.removeItem("access_token");
     localStorage.removeItem("user");
     setUser(null);
