@@ -18,6 +18,8 @@ const CATEGORIES = [
   "General",
 ];
 const STATUSES = ["Unread", "Read", "Acknowledged"];
+// Employee-facing labels (stored values unchanged).
+const STATUS_LABEL = { Unread: "New", Read: "Read", Acknowledged: "Confirmed" };
 
 const PRIORITY_STYLE = {
   High: "bg-red-50 text-status-unread",
@@ -153,7 +155,7 @@ export default function EmployeeDashboard() {
           {!isStaff && (
             <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="">All statuses</option>
-              {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
             </select>
           )}
           <button type="submit" className="btn-primary">Search</button>

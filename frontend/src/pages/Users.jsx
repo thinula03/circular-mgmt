@@ -16,6 +16,11 @@ export default function Users() {
   const [users, setUsers] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [deptForm, setDeptForm] = useState({ name: "", code: "" });
+  const [query, setQuery] = useState("");
+  const [filterRole, setFilterRole] = useState("");
+  const [filterDept, setFilterDept] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -54,6 +59,31 @@ export default function Users() {
     await client.patch(`/users/${id}`, changes);
     await load();
   }
+
+  async function addDepartment(e) {
+    e.preventDefault();
+    setError("");
+    try {
+      await client.post("/users/departments", {
+        name: deptForm.name.trim(),
+        code: deptForm.code.trim(),
+      });
+      setDeptForm({ name: "", code: "" });
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to add department.");
+    }
+  }
+
+  const filteredUsers = users.filter((u) => {
+    const q = query.trim().toLowerCase();
+    if (q && !(`${u.full_name} ${u.username} ${u.email}`.toLowerCase().includes(q))) return false;
+    if (filterRole && u.role !== filterRole) return false;
+    if (filterDept && String(u.department_id || "") !== filterDept) return false;
+    if (filterStatus === "active" && !u.is_active) return false;
+    if (filterStatus === "inactive" && u.is_active) return false;
+    return true;
+  });
 
   async function toggleActive(u) {
     const action = u.is_active ? "deactivate" : "activate";
@@ -105,6 +135,44 @@ export default function Users() {
         </div>
       </form>
 
+      {/* Add department */}
+      <form onSubmit={addDepartment} className="card flex flex-wrap items-end gap-3 p-5">
+        <div className="flex-1 min-w-[10rem]">
+          <label className="mb-1 block text-xs font-medium uppercase text-ink-muted">Department name</label>
+          <input className="input" placeholder="e.g. Compliance" value={deptForm.name}
+            onChange={(e) => setDeptForm({ ...deptForm, name: e.target.value })} required />
+        </div>
+        <div className="w-32">
+          <label className="mb-1 block text-xs font-medium uppercase text-ink-muted">Code</label>
+          <input className="input" placeholder="e.g. COMP" value={deptForm.code}
+            onChange={(e) => setDeptForm({ ...deptForm, code: e.target.value })} required />
+        </div>
+        <button type="submit" className="btn-ghost">+ Add department</button>
+        <span className="text-xs text-ink-muted">{departments.length} departments</span>
+      </form>
+
+      {/* Search + filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input className="input max-w-xs" placeholder="Search name, username, email…"
+          value={query} onChange={(e) => setQuery(e.target.value)} />
+        <select className="input" value={filterRole} onChange={(e) => setFilterRole(e.target.value)}>
+          <option value="">All roles</option>
+          {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+        <select className="input" value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
+          <option value="">All departments</option>
+          {departments.map((d) => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
+        </select>
+        <select className="input" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+          <option value="">All statuses</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <span className="text-sm text-ink-muted">
+          {filteredUsers.length} of {users.length}
+        </span>
+      </div>
+
       {/* Users table */}
       <div className="card overflow-hidden">
         <table className="w-full text-sm">
@@ -118,7 +186,9 @@ export default function Users() {
             </tr>
           </thead>
           <tbody className="divide-y divide-ink-line">
-            {users.map((u) => (
+            {filteredUsers.length === 0 ? (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-ink-muted">No users match.</td></tr>
+            ) : filteredUsers.map((u) => (
               <tr key={u.id} className={u.is_active ? "" : "opacity-50"}>
                 <td className="px-4 py-3">
                   <div className="font-medium text-ink">{u.full_name}</div>

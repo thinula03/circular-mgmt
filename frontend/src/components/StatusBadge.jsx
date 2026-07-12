@@ -6,6 +6,14 @@ const STYLES = {
   Acknowledged: "bg-green-50 text-status-ack",
 };
 
+// Friendlier employee-facing labels. The stored status value is unchanged
+// ("Acknowledged"); only the wording shown to the employee differs.
+const LABELS = {
+  Unread: "New",
+  Read: "Read",
+  Acknowledged: "Confirmed",
+};
+
 export default function StatusBadge({ status }) {
   const dot = {
     Unread: "bg-status-unread",
@@ -15,7 +23,7 @@ export default function StatusBadge({ status }) {
   return (
     <span className={`badge ${STYLES[status] || "bg-slate-100 text-ink-muted"}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${dot || "bg-slate-400"}`} />
-      {status}
+      {LABELS[status] || status}
     </span>
   );
 }

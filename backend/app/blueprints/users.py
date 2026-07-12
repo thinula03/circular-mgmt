@@ -21,6 +21,29 @@ def list_departments():
     return jsonify([d.to_dict() for d in Department.query.order_by(Department.name).all()])
 
 
+@users_bp.post("/departments")
+@jwt_required()
+@roles_required("Administrator")
+def create_department():
+    """Create a new department (FR-05 organisation setup)."""
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    code = (data.get("code") or "").strip().upper()
+    description = (data.get("description") or "").strip() or None
+    if not name or not code:
+        return jsonify({"error": "Department name and code are required."}), 400
+    clash = Department.query.filter(
+        (Department.name == name) | (Department.code == code)).first()
+    if clash:
+        return jsonify({"error": "A department with that name or code already exists."}), 409
+    dep = Department(name=name, code=code, description=description)
+    db.session.add(dep)
+    db.session.commit()
+    audit.record("DEPARTMENT_CREATED", user_id=int(get_jwt_identity()),
+                 entity_type="Department", entity_id=dep.id, detail=f"{name} ({code})")
+    return jsonify(dep.to_dict()), 201
+
+
 @users_bp.get("")
 @jwt_required()
 @roles_required("Administrator")

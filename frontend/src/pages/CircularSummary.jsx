@@ -262,7 +262,7 @@ export default function CircularSummary() {
                   "Saving…"
                 ) : (
                   <span className="flex items-center gap-2">
-                    <Icon name="check" className="h-4 w-4" /> Acknowledge
+                    <Icon name="check" className="h-4 w-4" /> Confirm
                   </span>
                 )}
               </button>
