@@ -7,7 +7,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from ..extensions import db
-from ..models.identity import User, Department
+from ..models.identity import User, Department, CircularDepartment
 from ..services.security import roles_required, hash_password
 from ..services import audit
 
@@ -42,6 +42,23 @@ def create_department():
     audit.record("DEPARTMENT_CREATED", user_id=int(get_jwt_identity()),
                  entity_type="Department", entity_id=dep.id, detail=f"{name} ({code})")
     return jsonify(dep.to_dict()), 201
+
+
+@users_bp.delete("/departments/<int:dep_id>")
+@jwt_required()
+@roles_required("Administrator")
+def delete_department(dep_id):
+    """Delete a department; unassign its users and remove its routing links."""
+    dep = Department.query.get(dep_id)
+    if not dep:
+        return jsonify({"error": "Department not found."}), 404
+    User.query.filter_by(department_id=dep_id).update({"department_id": None})
+    CircularDepartment.query.filter_by(department_id=dep_id).delete()
+    db.session.delete(dep)
+    db.session.commit()
+    audit.record("DEPARTMENT_DELETED", user_id=int(get_jwt_identity()),
+                 entity_type="Department", entity_id=dep_id, detail=dep.name)
+    return jsonify({"message": f"Department '{dep.name}' deleted."})
 
 
 @users_bp.get("")

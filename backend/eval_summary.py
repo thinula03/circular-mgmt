@@ -98,12 +98,20 @@ def main():
               f"{sum(r[2] for r in rows)/n:>12.3f}{sum(r[3] for r in rows)/n:>12.3f}")
 
         # ---- BERTScore (semantic) ----
+        # Use the locally cached bert-base-uncased model (avoids downloading the
+        # default roberta-large, which fails under the app's offline mode). Allow
+        # a one-off download only if the chosen model is missing.
+        os.environ["HF_HUB_OFFLINE"] = "0"
+        os.environ["TRANSFORMERS_OFFLINE"] = "0"
         try:
             from bert_score import score as bert_score
-            _, _, f1 = bert_score(gens, golds, lang="en", verbose=False)
-            print(f"\nBERTScore F1 (semantic): {f1.mean().item():.3f}")
+            _, _, f1 = bert_score(gens, golds, model_type="bert-base-uncased",
+                                  num_layers=9, verbose=False)
+            print(f"\nBERTScore F1 (semantic, bert-base-uncased): {f1.mean().item():.3f}")
         except ImportError:
             print("\n(Install bert-score for the semantic metric: pip install bert-score)")
+        except Exception as exc:  # noqa: BLE001
+            print(f"\n(BERTScore skipped: {exc})")
         print("=" * 68)
 
 

@@ -75,6 +75,17 @@ export default function Users() {
     }
   }
 
+  async function deleteDepartment(d) {
+    if (!window.confirm(`Delete department "${d.name}"? Its users will be unassigned.`)) return;
+    setError("");
+    try {
+      await client.delete(`/users/departments/${d.id}`);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to delete department.");
+    }
+  }
+
   const filteredUsers = users.filter((u) => {
     const q = query.trim().toLowerCase();
     if (q && !(`${u.full_name} ${u.username} ${u.email}`.toLowerCase().includes(q))) return false;
@@ -149,6 +160,17 @@ export default function Users() {
         </div>
         <button type="submit" className="btn-ghost">+ Add department</button>
         <span className="text-xs text-ink-muted">{departments.length} departments</span>
+        {departments.length > 0 && (
+          <div className="w-full flex flex-wrap gap-2 border-t border-ink-line pt-3">
+            {departments.map((d) => (
+              <span key={d.id} className="badge bg-ink-surface text-ink">
+                {d.name} <span className="text-ink-muted">({d.code})</span>
+                <button type="button" onClick={() => deleteDepartment(d)}
+                  className="ml-1 text-ink-muted hover:text-status-unread" title="Delete department">✕</button>
+              </span>
+            ))}
+          </div>
+        )}
       </form>
 
       {/* Search + filters */}

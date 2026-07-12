@@ -1,9 +1,241 @@
 [
   {
-    "question": "What is the deadline to acknowledge this circular?",
-    "expected_circular": "",
+    "question": "What is the main objective of Circular No. 04 of 2024?",
+    "expected_circular": "04/2024",
     "expected_keywords": [
-      "days"
+      "relief measures",
+      "SMEs",
+      "affected businesses"
+    ]
+  },
+  {
+    "question": "Which organizations must implement this circular?",
+    "expected_circular": "04/2024",
+    "expected_keywords": [
+      "licensed commercial banks",
+      "licensed specialized banks"
+    ]
+  },
+  {
+    "question": "Which SMEs are eligible for the relief measures?",
+    "expected_circular": "04/2024",
+    "expected_keywords": [
+      "Stage 3",
+      "01.04.2019",
+      "Business Revival Unit"
+    ]
+  },
+  {
+    "question": "By what date must SMEs begin discussions with Business Revival Units?",
+    "expected_circular": "04/2024",
+    "expected_keywords": [
+      "31.03.2025"
+    ]
+  },
+  {
+    "question": "What is the deadline for entering into loan rescheduling agreements?",
+    "expected_circular": "04/2024",
+    "expected_keywords": [
+      "15.06.2025"
+    ]
+  },
+  {
+    "question": "What factors should banks consider before rescheduling a loan?",
+    "expected_circular": "04/2024",
+    "expected_keywords": [
+      "repayment capacity",
+      "business revival plan"
+    ]
+  },
+  {
+    "question": "When must repayment begin for loans below Rs. 25 million?",
+    "expected_circular": "04/2024",
+    "expected_keywords": [
+      "31.12.2025"
+    ]
+  },
+  {
+    "question": "When must repayment begin for loans between Rs. 25 million and Rs. 50 million?",
+    "expected_circular": "04/2024",
+    "expected_keywords": [
+      "30.09.2025"
+    ]
+  },
+  {
+    "question": "When must repayment begin for loans above Rs. 50 million?",
+    "expected_circular": "04/2024",
+    "expected_keywords": [
+      "30.06.2025"
+    ]
+  },
+  {
+    "question": "What additional relief may banks provide to eligible borrowers?",
+    "expected_circular": "04/2024",
+    "expected_keywords": [
+      "working capital",
+      "case-by-case"
+    ]
+  },
+  {
+    "question": "Can a bank reject a loan application solely because of an adverse CRIB record?",
+    "expected_circular": "04/2024",
+    "expected_keywords": [
+      "shall not",
+      "CRIB"
+    ]
+  },
+  {
+    "question": "What should banks do if a relief request is rejected?",
+    "expected_circular": "04/2024",
+    "expected_keywords": [
+      "inform the borrower",
+      "reasons",
+      "appeal"
+    ]
+  },
+  {
+    "question": "Who can borrowers appeal to if relief is rejected?",
+    "expected_circular": "04/2024",
+    "expected_keywords": [
+      "Director",
+      "Financial Consumer Relations Department",
+      "Central Bank of Sri Lanka"
+    ]
+  },
+  {
+    "question": "What information must banks provide to borrowers upon request?",
+    "expected_circular": "04/2024",
+    "expected_keywords": [
+      "capital",
+      "interest",
+      "charges"
+    ]
+  },
+  {
+    "question": "What is the deadline to acknowledge this circular?",
+    "expected_circular": "04/2024",
+    "expected_keywords": [
+      "not specified",
+      "no deadline"
+    ]
+  },
+  {
+    "question": "What is the main purpose of Circular No. 01 of 2025?",
+    "expected_circular": "01/2025",
+    "expected_keywords": [
+      "clarify",
+      "relief measures",
+      "SMEs",
+      "implementation"
+    ]
+  },
+  {
+    "question": "Which previous circular does this addendum relate to?",
+    "expected_circular": "01/2025",
+    "expected_keywords": [
+      "04/2024"
+    ]
+  },
+  {
+    "question": "Who issued this addendum circular?",
+    "expected_circular": "01/2025",
+    "expected_keywords": [
+      "Central Bank of Sri Lanka"
+    ]
+  },
+  {
+    "question": "What type of businesses are targeted by the relief measures?",
+    "expected_circular": "01/2025",
+    "expected_keywords": [
+      "Small and Medium Enterprises",
+      "SMEs"
+    ]
+  },
+  {
+    "question": "What unit must licensed banks establish under this addendum?",
+    "expected_circular": "01/2025",
+    "expected_keywords": [
+      "Relief Banking Unit"
+    ]
+  },
+  {
+    "question": "What is the purpose of the Relief Banking Unit?",
+    "expected_circular": "01/2025",
+    "expected_keywords": [
+      "extending",
+      "monitoring",
+      "relief measures"
+    ]
+  },
+  {
+    "question": "Do Business Revival Units continue to operate after this addendum?",
+    "expected_circular": "01/2025",
+    "expected_keywords": [
+      "continue",
+      "Business Revival Units"
+    ]
+  },
+  {
+    "question": "What is the maximum period for rescheduling credit facilities?",
+    "expected_circular": "01/2025",
+    "expected_keywords": [
+      "ten years",
+      "10 years"
+    ]
+  },
+  {
+    "question": "What factors should banks consider before rescheduling a loan?",
+    "expected_circular": "01/2025",
+    "expected_keywords": [
+      "repayment capacity",
+      "revival plan"
+    ]
+  },
+  {
+    "question": "Can loan rescheduling decisions be made on a case-by-case basis?",
+    "expected_circular": "01/2025",
+    "expected_keywords": [
+      "case-by-case"
+    ]
+  },
+  {
+    "question": "How should interest rates be determined for rescheduled loans?",
+    "expected_circular": "01/2025",
+    "expected_keywords": [
+      "benchmark interest rates",
+      "agreed"
+    ]
+  },
+  {
+    "question": "Who must agree on the terms and conditions of the rescheduled loan?",
+    "expected_circular": "01/2025",
+    "expected_keywords": [
+      "licensed bank",
+      "eligible borrower"
+    ]
+  },
+  {
+    "question": "What new transparency requirement is introduced under Paragraph 3.3?",
+    "expected_circular": "01/2025",
+    "expected_keywords": [
+      "grievance-handling mechanism",
+      "transparent"
+    ]
+  },
+  {
+    "question": "What type of disputes should the grievance-handling mechanism address?",
+    "expected_circular": "01/2025",
+    "expected_keywords": [
+      "valuation",
+      "auctioned properties"
+    ]
+  },
+  {
+    "question": "What is the deadline to acknowledge this circular?",
+    "expected_circular": "01/2025",
+    "expected_keywords": [
+      "not specified",
+      "no deadline"
     ]
   }
 ]

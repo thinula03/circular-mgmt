@@ -1,0 +1,212 @@
+
+ 
+
+Evaluating 30 questions
+============================================================
+
+Q: What is the main objective of Circular No. 04 of 2024?
+A: The main objective of Circular No. 04 of 2024 is to provide relief measures to assist affected Small and Medium Enterprises (SMEs). 
+
+Key features of the Relief Measures:
+- The relief measures will ap
+   cited: ['01/2025']
+   retrieval: MISS (expected 04/2024)
+   answer:    HIT (expected one of ['relief measures', 'SMEs', 'affected businesses'])
+
+Q: Which organizations must implement this circular?
+A: Licensed banks must implement this circular.
+   cited: ['01/2025']
+   retrieval: MISS (expected 04/2024)
+   answer:    MISS (expected one of ['licensed commercial banks', 'licensed specialized banks'])
+
+Q: Which SMEs are eligible for the relief measures?
+A: SMEs eligible for the relief measures are those who meet the following criteria:
+- Credit facilities of SMEs that have been classified as Stage 3 on or after 01.04.2019,
+- SMEs that commenced discussi
+   cited: ['01/2025']
+   retrieval: MISS (expected 04/2024)
+   answer:    HIT (expected one of ['Stage 3', '01.04.2019', 'Business Revival Unit'])
+
+Q: By what date must SMEs begin discussions with Business Revival Units?
+A: SMEs must begin discussions with Business Revival Units by 31.03.2025, subject to submission of all necessary documents.
+   cited: ['01/2025']
+   retrieval: MISS (expected 04/2024)
+   answer:    HIT (expected one of ['31.03.2025'])
+
+Q: What is the deadline for entering into loan rescheduling agreements?
+A: Licensed banks may enter into rescheduling agreements with eligible SME borrowers not later than 15.06.2025.
+   cited: ['01/2025']
+   retrieval: MISS (expected 04/2024)
+   answer:    HIT (expected one of ['15.06.2025'])
+
+Q: What factors should banks consider before rescheduling a loan?
+A: Licensed banks may reschedule credit facilities on a case-by-case basis, considering the repayment capacity of the borrower and an acceptable revival plan. Key factors to consider include:
+- The repay
+   cited: ['01/2025']
+   retrieval: MISS (expected 04/2024)
+   answer:    HIT (expected one of ['repayment capacity', 'business revival plan'])
+
+Q: When must repayment begin for loans below Rs. 25 million?
+A: Repayment must begin for loans below Rs. 25 million not later than 31.12.2025.
+   cited: ['01/2025']
+   retrieval: MISS (expected 04/2024)
+   answer:    HIT (expected one of ['31.12.2025'])
+
+Q: When must repayment begin for loans between Rs. 25 million and Rs. 50 million?
+A: For loans between Rs. 25 million and Rs. 50 million, repayment must commence by not later than 30.09.2025.
+   cited: ['01/2025']
+   retrieval: MISS (expected 04/2024)
+   answer:    HIT (expected one of ['30.09.2025'])
+
+Q: When must repayment begin for loans above Rs. 50 million?
+A: Repayment must begin for loans above Rs. 50 million not later than 30.06.2025.
+   cited: ['01/2025']
+   retrieval: MISS (expected 04/2024)
+   answer:    HIT (expected one of ['30.06.2025'])
+
+Q: What additional relief may banks provide to eligible borrowers?
+A: Licensed banks may consider further reliefs, including granting of working capital facilities to eligible borrowers subject to repayment capacity and submission of credible business revival plans, on 
+   cited: ['01/2025']
+   retrieval: MISS (expected 04/2024)
+   answer:    HIT (expected one of ['working capital', 'case-by-case'])
+
+Q: Can a bank reject a loan application solely because of an adverse CRIB record?
+A: Licensed banks shall not decline loan applications from eligible borrowers under this Circular solely based on an adverse CRIB record. 
+- Licensed banks in consultation with the Credit Information Bur
+   cited: ['01/2025']
+   retrieval: MISS (expected 04/2024)
+   answer:    HIT (expected one of ['shall not', 'CRIB'])
+
+Q: What should banks do if a relief request is rejected?
+A: If a relief request is rejected, licensed banks should inform the borrower the reasons for such rejection. The borrower has an opportunity to appeal against such rejection to the Director, Financial C
+   cited: ['01/2025']
+   retrieval: MISS (expected 04/2024)
+   answer:    HIT (expected one of ['inform the borrower', 'reasons', 'appeal'])
+
+Q: Who can borrowers appeal to if relief is rejected?
+A: Borrowers can appeal against a rejection/dispute on providing relief measures to the Director, Financial Consumer Relations Department of the Central Bank of Sri Lanka.
+   cited: ['01/2025']
+   retrieval: MISS (expected 04/2024)
+   answer:    HIT (expected one of ['Director', 'Financial Consumer Relations Department', 'Central Bank of Sri Lanka'])
+
+Q: What information must banks provide to borrowers upon request?
+A: Licensed banks must make available the breakdown of capital, interest and other charges of credit facilities on request of the eligible borrowers.
+   cited: ['01/2025']
+   retrieval: MISS (expected 04/2024)
+   answer:    HIT (expected one of ['capital', 'interest', 'charges'])
+
+Q: What is the deadline to acknowledge this circular?
+A: The deadline to acknowledge this circular is not specified. However, licensed banks are requested to establish a transparent grievance-handling mechanism with respect to any dispute that may arise bet
+   cited: ['01/2025']
+   retrieval: MISS (expected 04/2024)
+   answer:    HIT (expected one of ['not specified', 'no deadline'])
+
+Q: What is the main purpose of Circular No. 01 of 2025?
+A: The main purpose of Circular No. 01 of 2025 is to further clarify relief measures for Small and Medium Enterprises (SMEs) as stated in Circular No. 04 of 2024, ensuring effective implementation across
+   cited: ['01/2025']
+   retrieval: HIT (expected 01/2025)
+   answer:    HIT (expected one of ['clarify', 'relief measures', 'SMEs', 'implementation'])
+
+Q: Which previous circular does this addendum relate to?
+A: This Addendum relates to Circular No. 04 of 2024 on Relief Measures to Assist the Affected Small and Medium Enterprises (SMEs).
+   cited: ['01/2025']
+   retrieval: HIT (expected 01/2025)
+   answer:    MISS (expected one of ['04/2024'])
+
+Q: Who issued this addendum circular?
+A: The Central Bank of Sri Lanka issued this Addendum Circular No. 01 of 2025.
+   cited: ['01/2025']
+   retrieval: HIT (expected 01/2025)
+   answer:    HIT (expected one of ['Central Bank of Sri Lanka'])
+
+Q: What type of businesses are targeted by the relief measures?
+A: Small and Medium Enterprises (SMEs). 
+- Licensed banks may reschedule credit facilities for eligible borrowers with a maximum period of up to ten years, unless the original agreement has provided a lo
+   cited: ['01/2025']
+   retrieval: HIT (expected 01/2025)
+   answer:    HIT (expected one of ['Small and Medium Enterprises', 'SMEs'])
+
+Q: What unit must licensed banks establish under this addendum?
+A: Licensed banks must establish a Relief Banking Unit for the purpose of extending and monitoring the relief measures under Circular No. 04 of 2024 on Relief Measures to Assist the Affected Small and Me
+   cited: ['01/2025']
+   retrieval: HIT (expected 01/2025)
+   answer:    HIT (expected one of ['Relief Banking Unit'])
+
+Q: What is the purpose of the Relief Banking Unit?
+A: The purpose of the Relief Banking Unit is to extend and monitor relief measures under Circular No. 04 of 2024 for the effective implementation of such relief measures while the existing Business Reviv
+   cited: ['01/2025']
+   retrieval: HIT (expected 01/2025)
+   answer:    HIT (expected one of ['extending', 'monitoring', 'relief measures'])
+
+Q: Do Business Revival Units continue to operate after this addendum?
+A: Business Revival Units established under Circular No. 02 of 2024 on Guidelines for the Establishment of Business Revival Units in Licensed Banks, will continue for the intended purpose thereof.
+   cited: ['01/2025']
+   retrieval: HIT (expected 01/2025)
+   answer:    HIT (expected one of ['continue', 'Business Revival Units'])
+
+Q: What is the maximum period for rescheduling credit facilities?
+A: The maximum period for rescheduling credit facilities is up to ten years. 
+
+Here are the conditions:
+- The original agreement has provided a period longer than ten years, in which case the maximum per
+   cited: ['01/2025']
+   retrieval: HIT (expected 01/2025)
+   answer:    HIT (expected one of ['ten years', '10 years'])
+
+Q: What factors should banks consider before rescheduling a loan?
+A: Banks should consider the repayment capacity of the borrower and an acceptable revival plan when rescheduling a loan. 
+
+Key considerations:
+- The original agreement period (if longer than ten years)
+-
+   cited: ['01/2025']
+   retrieval: HIT (expected 01/2025)
+   answer:    HIT (expected one of ['repayment capacity', 'revival plan'])
+
+Q: Can loan rescheduling decisions be made on a case-by-case basis?
+A: Loan rescheduling decisions can be made on a case-by-case basis. Here are the relevant details:
+- Licensed banks may consider further reliefs, including granting of working capital facilities to eligi
+   cited: ['01/2025']
+   retrieval: HIT (expected 01/2025)
+   answer:    HIT (expected one of ['case-by-case'])
+
+Q: How should interest rates be determined for rescheduled loans?
+A: Licensed banks may agree on the terms and conditions including the interest rates considering the prevailing benchmark interest rates. 
+- The applicable interest rate on rescheduled loans is determine
+   cited: ['01/2025']
+   retrieval: HIT (expected 01/2025)
+   answer:    HIT (expected one of ['benchmark interest rates', 'agreed'])
+
+Q: Who must agree on the terms and conditions of the rescheduled loan?
+A: Licensed banks and the eligible borrower shall agree on the terms and conditions including the interest rates considering the prevailing benchmark interest rates. 
+- The interest rate is applicable to
+   cited: ['01/2025']
+   retrieval: HIT (expected 01/2025)
+   answer:    HIT (expected one of ['licensed bank', 'eligible borrower'])
+
+Q: What new transparency requirement is introduced under Paragraph 3.3?
+A: Licensed banks are requested to establish a transparent grievance-handling mechanism with respect to any dispute that may arise between the bank and the borrower on the valuation of auctioned properti
+   cited: ['01/2025']
+   retrieval: HIT (expected 01/2025)
+   answer:    HIT (expected one of ['grievance-handling mechanism', 'transparent'])
+
+Q: What type of disputes should the grievance-handling mechanism address?
+A: The grievance-handling mechanism should address disputes related to the valuation of auctioned properties. 
+- Licensed banks are requested to establish a transparent grievance-handling mechanism with 
+   cited: ['01/2025']
+   retrieval: HIT (expected 01/2025)
+   answer:    HIT (expected one of ['valuation', 'auctioned properties'])
+
+Q: What is the deadline to acknowledge this circular?
+A: There is no specific deadline mentioned in the circular to acknowledge it. However, licensed banks are requested to establish a transparent grievance-handling mechanism with respect to any dispute tha
+   cited: ['01/2025']
+   retrieval: HIT (expected 01/2025)
+   answer:    MISS (expected one of ['not specified', 'no deadline'])
+
+============================================================
+Retrieval hit-rate: 15/30 = 50%
+Answer accuracy:    27/30 = 90%
+
+chamu@LAPTOP-FG5PS7VI MINGW64 /d/university/academic/4th year/1st semester/research CTEC 43018/cicular-management/backend (main)
+ 
+ 

@@ -62,6 +62,33 @@ def overview():
     })
 
 
+@dashboard_bp.get("/users")
+@jwt_required()
+@roles_required("Manager", "Administrator")
+def user_overview():
+    """User statistics: totals, active/inactive, by role and by department."""
+    total = User.query.count()
+    active = User.query.filter_by(is_active=True).count()
+
+    role_rows = (db.session.query(User.role, func.count(User.id))
+                 .group_by(User.role).all())
+    by_role = [{"role": r, "count": int(n)} for r, n in role_rows]
+
+    dept_rows = (db.session.query(Department.name, func.count(User.id))
+                 .outerjoin(User, User.department_id == Department.id)
+                 .group_by(Department.id)
+                 .order_by(Department.name).all())
+    by_department = [{"department": name, "count": int(n)} for name, n in dept_rows]
+
+    return jsonify({
+        "total": total,
+        "active": active,
+        "inactive": total - active,
+        "by_role": by_role,
+        "by_department": by_department,
+    })
+
+
 @dashboard_bp.get("/trends")
 @jwt_required()
 @roles_required("Manager", "Administrator")

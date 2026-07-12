@@ -16,6 +16,7 @@ export default function ManagerDashboard() {
   const [trends, setTrends] = useState(null);
   const [circulars, setCirculars] = useState([]);
   const [ai, setAi] = useState(null);
+  const [userStats, setUserStats] = useState(null);
   const [expanded, setExpanded] = useState(null); // circular id
   const [employees, setEmployees] = useState([]);
 
@@ -24,6 +25,7 @@ export default function ManagerDashboard() {
     client.get("/dashboard/trends").then((r) => setTrends(r.data));
     client.get("/dashboard/circulars").then((r) => setCirculars(r.data));
     client.get("/dashboard/ai-performance").then((r) => setAi(r.data));
+    client.get("/dashboard/users").then((r) => setUserStats(r.data)).catch(() => {});
   }, []);
 
   async function toggle(id) {
@@ -195,6 +197,75 @@ export default function ManagerDashboard() {
           </div>
           <div className="mt-2 text-xs text-ink-muted">
             Models: {ai.models_used?.join(", ") || "—"}
+          </div>
+        </div>
+      )}
+
+      {/* User overview (at end) */}
+      {userStats && (
+        <div className="space-y-4">
+          <h2 className="text-sm font-semibold text-ink">User overview</h2>
+
+          {/* Totals */}
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="card p-5">
+              <div className="text-xs font-medium uppercase tracking-wide text-ink-muted">Total users</div>
+              <div className="mt-1 text-3xl font-bold text-ink">{userStats.total}</div>
+            </div>
+            <div className="card p-5">
+              <div className="text-xs font-medium uppercase tracking-wide text-ink-muted">Active</div>
+              <div className="mt-1 text-3xl font-bold text-status-ack">{userStats.active}</div>
+            </div>
+            <div className="card p-5">
+              <div className="text-xs font-medium uppercase tracking-wide text-ink-muted">Inactive</div>
+              <div className="mt-1 text-3xl font-bold text-ink-muted">{userStats.inactive}</div>
+            </div>
+          </div>
+
+          {/* By role + by department */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="card p-6">
+              <h3 className="mb-3 text-sm font-semibold text-ink">Users by role</h3>
+              <table className="w-full text-sm">
+                <tbody className="divide-y divide-ink-line">
+                  {userStats.by_role.map((r) => (
+                    <tr key={r.role}>
+                      <td className="py-2 text-ink">{r.role}</td>
+                      <td className="py-2 text-right font-semibold text-ink">{r.count}</td>
+                      <td className="w-1/2 py-2 pl-3">
+                        <div className="h-2 overflow-hidden rounded-full bg-ink-surface">
+                          <div className="h-full bg-brand-500"
+                            style={{ width: `${userStats.total ? (100 * r.count) / userStats.total : 0}%` }} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="card p-6">
+              <h3 className="mb-3 text-sm font-semibold text-ink">Users by department</h3>
+              <table className="w-full text-sm">
+                <tbody className="divide-y divide-ink-line">
+                  {userStats.by_department.map((d) => (
+                    <tr key={d.department}>
+                      <td className="py-2 text-ink">{d.department}</td>
+                      <td className="py-2 text-right font-semibold text-ink">{d.count}</td>
+                      <td className="w-1/2 py-2 pl-3">
+                        <div className="h-2 overflow-hidden rounded-full bg-ink-surface">
+                          <div className="h-full bg-status-read"
+                            style={{ width: `${userStats.total ? (100 * d.count) / userStats.total : 0}%` }} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {userStats.by_department.length === 0 && (
+                    <tr><td className="py-3 text-ink-muted">No departments.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
