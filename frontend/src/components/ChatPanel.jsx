@@ -211,7 +211,7 @@ export default function ChatPanel({ circularId = null }) {
                     {dedupeCitations(m.citations).map(({ number, superseded }) => (
                       <span key={number} className="badge bg-white text-[11px] text-ink-muted">
                         <Icon name="document" className="h-3 w-3" />
-                        {number}{superseded ? " (superseded)" : ""}
+                        {number}{superseded ? " (updated)" : ""}
                       </span>
                     ))}
                   </div>

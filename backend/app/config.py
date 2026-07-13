@@ -27,7 +27,7 @@ class Config:
     # ---- JWT (FR-01 auth, FR-03 30-min session) ----
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-jwt-change-me")
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(
-        minutes=int(os.getenv("JWT_ACCESS_MINUTES", "30"))
+        minutes=int(os.getenv("JWT_ACCESS_MINUTES", "60"))
     )
 
     # ---- File upload (FR-06, FR-09) ----

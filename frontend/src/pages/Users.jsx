@@ -15,8 +15,10 @@ const EMPTY_FORM = {
 export default function Users() {
   const [users, setUsers] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [deptForm, setDeptForm] = useState({ name: "", code: "" });
+  const [catName, setCatName] = useState("");
   const [query, setQuery] = useState("");
   const [filterRole, setFilterRole] = useState("");
   const [filterDept, setFilterDept] = useState("");
@@ -25,12 +27,37 @@ export default function Users() {
   const [busy, setBusy] = useState(false);
 
   async function load() {
-    const [u, d] = await Promise.all([
+    const [u, d, c] = await Promise.all([
       client.get("/users"),
       client.get("/users/departments"),
+      client.get("/circulars/categories"),
     ]);
     setUsers(u.data);
     setDepartments(d.data);
+    setCategories(c.data);
+  }
+
+  async function addCategory(e) {
+    e.preventDefault();
+    setError("");
+    try {
+      await client.post("/circulars/categories", { name: catName.trim() });
+      setCatName("");
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to add category.");
+    }
+  }
+
+  async function deleteCategory(c) {
+    if (!window.confirm(`Delete category "${c.name}"?`)) return;
+    setError("");
+    try {
+      await client.delete(`/circulars/categories/${c.id}`);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to delete category.");
+    }
   }
 
   useEffect(() => {
@@ -167,6 +194,28 @@ export default function Users() {
                 {d.name} <span className="text-ink-muted">({d.code})</span>
                 <button type="button" onClick={() => deleteDepartment(d)}
                   className="ml-1 text-ink-muted hover:text-status-unread" title="Delete department">✕</button>
+              </span>
+            ))}
+          </div>
+        )}
+      </form>
+
+      {/* Manage categories */}
+      <form onSubmit={addCategory} className="card flex flex-wrap items-end gap-3 p-5">
+        <div className="flex-1 min-w-[10rem]">
+          <label className="mb-1 block text-xs font-medium uppercase text-ink-muted">Category name</label>
+          <input className="input" placeholder="e.g. Liquidity Risk" value={catName}
+            onChange={(e) => setCatName(e.target.value)} required />
+        </div>
+        <button type="submit" className="btn-ghost">+ Add category</button>
+        <span className="text-xs text-ink-muted">{categories.length} categories</span>
+        {categories.length > 0 && (
+          <div className="w-full flex flex-wrap gap-2 border-t border-ink-line pt-3">
+            {categories.map((c) => (
+              <span key={c.id} className="badge bg-brand-50 text-brand-700">
+                {c.name}
+                <button type="button" onClick={() => deleteCategory(c)}
+                  className="ml-1 text-brand-400 hover:text-status-unread" title="Delete category">✕</button>
               </span>
             ))}
           </div>

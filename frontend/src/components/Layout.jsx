@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import useIdleTimeout from "../hooks/useIdleTimeout.js";
@@ -19,8 +19,56 @@ const NAV = [
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const links = NAV.filter((n) => n.roles.includes(user?.role));
+
+  // Sidebar content, reused by the desktop aside and the mobile drawer.
+  const sidebar = (
+    <>
+      <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5">
+        <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/15 shadow-inner ring-1 ring-white/20">
+          <Icon name="bank" className="h-5 w-5 text-white" />
+        </div>
+        <div className="leading-tight">
+          <div className="text-sm font-bold tracking-tight">Circular Hub</div>
+          <div className="text-[11px] text-brand-100">CBSL Compliance</div>
+        </div>
+      </div>
+      <nav className="mt-4 flex flex-col gap-1 px-3">
+        {links.map((l) => (
+          <NavLink
+            key={l.to}
+            to={l.to}
+            end={l.to === "/"}
+            onClick={() => setMenuOpen(false)}
+            className={({ isActive }) =>
+              `group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all ${
+                isActive
+                  ? "bg-white/15 font-semibold text-white shadow-sm"
+                  : "text-brand-100 hover:bg-white/10 hover:text-white"
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                <span
+                  className={`absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-white transition-opacity ${
+                    isActive ? "opacity-100" : "opacity-0"
+                  }`}
+                />
+                <Icon name={l.icon} className="h-5 w-5" />
+                {l.label}
+              </>
+            )}
+          </NavLink>
+        ))}
+      </nav>
+      <div className="mt-auto px-5 py-4 text-[11px] leading-relaxed text-brand-100/80">
+        Smart Circular Summarization &amp; Management System
+      </div>
+    </>
+  );
 
   // FR-03: sign out after 30 minutes of inactivity.
   const handleIdle = useCallback(() => {
@@ -36,55 +84,38 @@ export default function Layout() {
 
   return (
     <div className="flex h-full min-h-screen">
-      {/* Sidebar */}
+      {/* Desktop sidebar */}
       <aside className="hidden w-64 flex-shrink-0 flex-col bg-gradient-to-b from-brand-700 to-brand-900 text-white shadow-xl md:flex">
-        <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/15 shadow-inner ring-1 ring-white/20">
-            <Icon name="bank" className="h-5 w-5 text-white" />
-          </div>
-          <div className="leading-tight">
-            <div className="text-sm font-bold tracking-tight">Circular Hub</div>
-            <div className="text-[11px] text-brand-100">CBSL Compliance</div>
-          </div>
-        </div>
-        <nav className="mt-4 flex flex-col gap-1 px-3">
-          {links.map((l) => (
-            <NavLink
-              key={l.to}
-              to={l.to}
-              end={l.to === "/"}
-              className={({ isActive }) =>
-                `group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all ${
-                  isActive
-                    ? "bg-white/15 font-semibold text-white shadow-sm"
-                    : "text-brand-100 hover:bg-white/10 hover:text-white"
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <span
-                    className={`absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-white transition-opacity ${
-                      isActive ? "opacity-100" : "opacity-0"
-                    }`}
-                  />
-                  <Icon name={l.icon} className="h-5 w-5" />
-                  {l.label}
-                </>
-              )}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="mt-auto px-5 py-4 text-[11px] leading-relaxed text-brand-100/80">
-          Smart Circular Summarization &amp; Management System
-        </div>
+        {sidebar}
       </aside>
+
+      {/* Mobile drawer */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-40 md:hidden" onClick={() => setMenuOpen(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <aside
+            className="absolute left-0 top-0 flex h-full w-64 flex-col bg-gradient-to-b from-brand-700 to-brand-900 text-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {sidebar}
+          </aside>
+        </div>
+      )}
 
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-ink-line bg-white px-6 py-3 shadow-sm">
-          <div className="text-sm text-ink-muted">
-            Welcome, <span className="font-semibold text-ink">{user?.full_name}</span>
+        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-ink-line bg-white px-4 py-3 shadow-sm sm:px-6">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMenuOpen(true)}
+              className="grid h-9 w-9 place-items-center rounded-lg border border-ink-line text-ink hover:bg-ink-surface md:hidden"
+              title="Menu"
+            >
+              <Icon name="menu" className="h-5 w-5" />
+            </button>
+            <div className="text-sm text-ink-muted">
+              Welcome, <span className="font-semibold text-ink">{user?.full_name}</span>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <NotificationBell />

@@ -218,7 +218,7 @@ export default function CircularSummary() {
       )}
       {circular.is_superseded && circular.amended_by && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-ink">
-          <span className="font-semibold text-status-read">Superseded.</span> Amended by{" "}
+          <span className="font-semibold text-status-read">Updated by</span>{" "}
           <Link to={`/circulars/${circular.amended_by.id}`} className="text-brand-600 hover:underline">
             {circular.amended_by.circular_number} — {circular.amended_by.title}
           </Link>.

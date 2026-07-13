@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
 
-// FR-03: auto-terminate inactive sessions after 30 minutes.
+// FR-03: auto-terminate inactive sessions after 1 hour.
 // Resets the countdown on any user activity; fires onIdle when the user has
 // been inactive for `timeoutMs`.
-const DEFAULT_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+const DEFAULT_TIMEOUT = 60 * 60 * 1000; // 1 hour
 
 export default function useIdleTimeout(onIdle, timeoutMs = DEFAULT_TIMEOUT) {
   const timer = useRef(null);

@@ -189,8 +189,10 @@ export default function EmployeeDashboard() {
                   <td className="px-4 py-3 font-mono text-xs text-ink-muted">{c.circular_number}</td>
                   <td className="px-4 py-3 font-medium text-ink">
                     {c.title}
-                    {c.is_superseded && (
-                      <span className="ml-2 badge bg-amber-50 text-status-read">Superseded</span>
+                    {c.is_superseded && c.amended_by && (
+                      <span className="ml-2 badge bg-amber-50 text-status-read">
+                        Updated by {c.amended_by.circular_number}
+                      </span>
                     )}
                     {c.amends && (
                       <span className="ml-2 badge bg-slate-100 text-ink-muted">
