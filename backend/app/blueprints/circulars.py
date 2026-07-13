@@ -199,7 +199,7 @@ def edit_circular(circular_id):
     data = request.get_json(silent=True) or {}
 
     if "circular_number" in data:
-        num = (data["circular_number"] or "").strip()
+        num = (data["circular_number"] or "").strip().strip("\"'").strip()
         if not num:
             return jsonify({"error": "Circular number cannot be empty."}), 400
         clash = Circular.query.filter(Circular.circular_number == num,
@@ -397,7 +397,8 @@ def upload_circular():
         return jsonify({"error": "Only PDF files are accepted."}), 400
 
     # ---- metadata from form (FR-08) ----
-    circular_number = (request.form.get("circular_number") or "").strip()
+    # Strip whitespace AND stray quotes so a pasted number like 'X"' is cleaned.
+    circular_number = (request.form.get("circular_number") or "").strip().strip("\"'").strip()
     title = (request.form.get("title") or "").strip()
     priority = request.form.get("priority", "Medium")
     issue_date_raw = (request.form.get("issue_date") or "").strip()
@@ -516,10 +517,10 @@ def summarize_circular(circular_id):
         db.session.commit()
         return jsonify({"error": f"Summarization failed: {exc}"}), 500
 
-    # Replace any previous summary so re-running is idempotent.
-    if circular.summary:
-        db.session.delete(circular.summary)
-        db.session.flush()
+    # Replace ALL previous summaries so re-running is idempotent (deleting every
+    # row, not just the one the relationship returns, prevents duplicates).
+    Summary.query.filter_by(circular_id=circular.id).delete()
+    db.session.flush()
     summary = Summary(
         circular_id=circular.id,
         summary_text=result.summary_text,

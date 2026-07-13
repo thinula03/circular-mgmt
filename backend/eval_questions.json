@@ -112,14 +112,6 @@
     ]
   },
   {
-    "question": "What is the deadline to acknowledge this circular?",
-    "expected_circular": "04/2024",
-    "expected_keywords": [
-      "not specified",
-      "no deadline"
-    ]
-  },
-  {
     "question": "What is the main purpose of Circular No. 01 of 2025?",
     "expected_circular": "01/2025",
     "expected_keywords": [
@@ -231,14 +223,6 @@
     ]
   },
   {
-    "question": "What is the deadline to acknowledge this circular?",
-    "expected_circular": "01/2025",
-    "expected_keywords": [
-      "not specified",
-      "no deadline"
-    ]
-  },
-  {
     "question": "What is the purpose of Circular No. 01 of 2021?",
     "expected_circular": "01/2021",
     "expected_keywords": [
@@ -345,14 +329,6 @@
     "expected_circular": "01/2021",
     "expected_keywords": [
       "debt repayment agreement"
-    ]
-  },
-  {
-    "question": "What is the deadline to acknowledge this circular?",
-    "expected_circular": "01/2021",
-    "expected_keywords": [
-      "not specified",
-      "no deadline"
     ]
   },
   {
@@ -468,14 +444,6 @@
     ]
   },
   {
-    "question": "What is the deadline to acknowledge this circular?",
-    "expected_circular": "01/2022",
-    "expected_keywords": [
-      "not specified",
-      "no deadline"
-    ]
-  },
-  {
     "question": "What is the main objective of Circular No. 02 of 2022?",
     "expected_circular": "02/2022",
     "expected_keywords": [
@@ -587,14 +555,6 @@
     "expected_circular": "02/2022",
     "expected_keywords": [
       "monthly"
-    ]
-  },
-  {
-    "question": "What is the deadline to acknowledge this circular?",
-    "expected_circular": "02/2022",
-    "expected_keywords": [
-      "not specified",
-      "no deadline"
     ]
   },
   {
@@ -776,14 +736,6 @@
       "Guideline 2.5(c)",
       "inserted immediately after Guideline 2.5(b)",
       "Annex I"
-    ]
-  },
-  {
-    "question": "What is the deadline to acknowledge this circular?",
-    "expected_circular": "",
-    "expected_keywords": [
-      "not specified",
-      "no deadline"
     ]
   },
   {
@@ -1031,125 +983,162 @@
     ]
   },
   {
-    "question": "What is the main objective of Circular No. 02 of 2022?",
-    "expected_circular": "02/2022",
+    "question": "What is the main purpose of Circular No. 03 of 2021?",
+    "expected_circular": "03/2021",
     "expected_keywords": [
-      "concessions",
-      "affected borrowers",
-      "macroeconomic circumstances"
+      "lease concessions",
+      "COVID-19 affected",
+      "passenger transportation sector",
+      "financial difficulties",
+      "consistent implementation"
     ]
   },
   {
-    "question": "Which financial institutions must implement this circular?",
-    "expected_circular": "02/2022",
+    "question": "Which financial institutions are required to implement the lease concession scheme?",
+    "expected_circular": "03/2021",
     "expected_keywords": [
       "licensed commercial banks",
-      "licensed specialized banks"
+      "licensed specialised banks",
+      "licensed banks"
     ]
   },
   {
-    "question": "Who is eligible to receive concessions under this circular?",
-    "expected_circular": "02/2022",
+    "question": "Which businesses and individuals are eligible for the concessions?",
+    "expected_circular": "03/2021",
     "expected_keywords": [
-      "businesses",
-      "individuals",
-      "affected borrowers"
+      "public passenger transportation",
+      "school transport",
+      "office transport",
+      "taxis",
+      "three-wheelers",
+      "tourism sector"
     ]
   },
   {
-    "question": "What types of concessions can banks provide for performing credit facilities?",
-    "expected_circular": "02/2022",
+    "question": "Which lease facilities qualify for relief under the circular?",
+    "expected_circular": "03/2021",
     "expected_keywords": [
-      "grace period",
-      "restructuring",
-      "rescheduling"
+      "performing lease facilities",
+      "under moratorium",
+      "as at 31 March 2021",
+      "eligible borrowers"
     ]
   },
   {
-    "question": "For how long are concessions for performing credit facilities expected to be provided?",
-    "expected_circular": "02/2022",
+    "question": "What is the maximum deferment period and when does it commence?",
+    "expected_circular": "03/2021",
     "expected_keywords": [
-      "six months"
+      "not exceeding 6 months",
+      "1 April 2021",
+      "capital and interest",
+      "shorter period as applicable"
     ]
   },
   {
-    "question": "Can borrowers settle their loans early without paying early settlement charges?",
-    "expected_circular": "02/2022",
+    "question": "What was the deadline for eligible borrowers to submit applications for deferment?",
+    "expected_circular": "03/2021",
     "expected_keywords": [
-      "early settlement",
-      "no additional fee"
+      "on or before 19 April 2021",
+      "writing",
+      "electronic means"
     ]
   },
   {
-    "question": "By what date must borrowers request an early settlement?",
-    "expected_circular": "02/2022",
+    "question": "Can an application submitted after 19 April 2021 be accepted?",
+    "expected_circular": "03/2021",
     "expected_keywords": [
-      "30.09.2022"
+      "accepted",
+      "after 19 April 2021",
+      "reason for delay",
+      "acceptable"
     ]
   },
   {
-    "question": "Until what date are recovery actions against eligible non-performing borrowers suspended?",
-    "expected_circular": "02/2022",
+    "question": "Which departments should participate in implementing the circular?",
+    "expected_circular": "03/2021",
     "expected_keywords": [
-      "31.12.2022"
+      "Credit Department",
+      "Loan Recovery Department",
+      "Branch Operation",
+      "Business Banking",
+      "SME Banking Department",
+      "Finance Department",
+      "Accounting Department",
+      "Risk Management",
+      "Legal and Compliance"
     ]
   },
   {
-    "question": "Which borrowers are not eligible for these concessions?",
-    "expected_circular": "02/2022",
+    "question": "What is the maximum interest rate that may be charged for the deferred period?",
+    "expected_circular": "03/2021",
     "expected_keywords": [
-      "willful defaulters",
-      "fraud",
-      "diversion of funds",
-      "unviable projects"
+      "latest auction rate",
+      "364-day Treasury Bills",
+      "as at 1 April 2021",
+      "plus 1 per cent per annum"
     ]
   },
   {
-    "question": "Can banks reject new loan applications solely because of an adverse CRIB record?",
-    "expected_circular": "02/2022",
+    "question": "When may interest charged for the deferred lease instalments be recovered?",
+    "expected_circular": "03/2021",
     "expected_keywords": [
-      "shall not",
-      "CRIB"
+      "from April 2023",
+      "existing lease instalment",
+      "remaining tenure ends before April 2023",
+      "completion of remaining tenure"
     ]
   },
   {
-    "question": "Within how long must banks notify borrowers of their decision on concession requests?",
-    "expected_circular": "02/2022",
+    "question": "When must borrowers begin repaying the deferred lease instalments?",
+    "expected_circular": "03/2021",
     "expected_keywords": [
-      "one month"
+      "remaining tenure",
+      "lease facility is over",
+      "commence repayment",
+      "deferred instalments"
     ]
   },
   {
-    "question": "What should banks do if a concession request is rejected?",
-    "expected_circular": "02/2022",
+    "question": "What recovery approach applies to instalments due under previous moratoriums?",
+    "expected_circular": "03/2021",
     "expected_keywords": [
-      "inform the borrower",
-      "reasons",
-      "appeal"
+      "commence recovery",
+      "during deferred period",
+      "previous moratoriums",
+      "repayment deferred",
+      "remaining tenure"
     ]
   },
   {
-    "question": "Who can borrowers appeal to if their concession request is rejected?",
-    "expected_circular": "02/2022",
+    "question": "What restrictions apply to penal interest, fees and charges under the scheme?",
+    "expected_circular": "03/2021",
     "expected_keywords": [
-      "Director",
-      "Financial Consumer Relations Department",
-      "Central Bank of Sri Lanka"
+      "waive penal interest",
+      "accrued and unpaid as at 1 April 2021",
+      "no penal interest during deferment",
+      "no excessive fees or charges"
     ]
   },
   {
-    "question": "How often must licensed banks report concession details to the Bank Supervision Department?",
-    "expected_circular": "02/2022",
+    "question": "What review or appeal procedure is available when a borrower’s request is declined?",
+    "expected_circular": "03/2021",
     "expected_keywords": [
-      "monthly"
-    ]
-  },
-  {
-    "question": "What is the deadline to acknowledge this circular?",
-    "expected_circular": "02/2022",
-    "expected_keywords": [
+      "no formal appeal procedure",
       "not specified",
-      "no deadline"
+      "reason for decline",
+      "clearly mention"
+    ]
+  },
+  {
+    "question": "What are the monthly reporting requirements imposed on licensed banks?",
+    "expected_circular": "03/2021",
+    "expected_keywords": [
+      "details of deferment",
+      "Bank Supervision Department",
+      "as at the 30th of each month",
+      "within 15 working days",
+      "commencing 1 May 2021",
+      "attached format"
     ]
   },
   {
@@ -1462,7 +1451,6 @@
       "details of concessions"
     ]
   },
-  
   {
     "question": "What is the main purpose of Circular No. 10 of 2021?",
     "expected_circular": "10/2021",
@@ -1617,7 +1605,6 @@
       "internal guidelines within 7 days"
     ]
   },
-
   {
     "question": "What is the main purpose of Human Resource Division Circular No. 65/2025?",
     "expected_circular": "65/2025",
@@ -1770,7 +1757,6 @@
       "Corporate Management Committee"
     ]
   },
-  
   {
     "question": "What is the main purpose of Operation Instruction Circular No. 16/2016?",
     "expected_circular": "16/2016",
@@ -1922,7 +1908,6 @@
       "no specific penalties"
     ]
   },
-  
   {
     "question": "What is the main purpose of BOC-ITD-PMO-SOP-001?",
     "expected_circular": "BOC-ITD-PMO-SOP-001",
@@ -2094,8 +2079,7 @@
       "no repayment obligation",
       "no recovery action"
     ]
-  }
-,
+  },
   {
     "question": "What is the main purpose of BOC-ITD-PMO-SOP-003?",
     "expected_circular": "BOC-ITD-PMO-SOP-003",
@@ -2258,7 +2242,6 @@
       "no recovery action"
     ]
   },
-  
   {
     "question": "What is the main purpose of BOC-ITD-POL-015?",
     "expected_circular": "BOC-ITD-POL-015",
@@ -2449,14 +2432,6 @@
     ]
   },
   {
-    "question": "What is the deadline to acknowledge this policy?",
-    "expected_circular": "",
-    "expected_keywords": [
-      "not specified",
-      "no deadline"
-    ]
-  },
-  {
     "question": "What incidents or suspicious activities must users report?",
     "expected_circular": "BOC-ITD-POL-044",
     "expected_keywords": [
@@ -2520,7 +2495,7 @@
   },
   {
     "question": "Does the policy establish any repayment obligation or repayment schedule?",
-    "expected_circular": "",
+    "expected_circular": "BOC-ITD-POL-044",
     "expected_keywords": [
       "not specified",
       "no repayment requirement"
@@ -2528,7 +2503,7 @@
   },
   {
     "question": "Does the policy specify any loan or debt recovery action?",
-    "expected_circular": "",
+    "expected_circular": "BOC-ITD-POL-044",
     "expected_keywords": [
       "not specified",
       "no recovery action"
@@ -2557,7 +2532,6 @@
       "authorization"
     ]
   },
-  
   {
     "question": "What is the main purpose of BOC-ITD-SOP-001?",
     "expected_circular": "BOC-ITD-SOP-001",
@@ -2729,8 +2703,7 @@
       "no repayment obligation",
       "no recovery action"
     ]
-  }
-,
+  },
   {
     "question": "What is the main purpose of Office Instructions Circular No. 32/2017?",
     "expected_circular": "32/2017",
@@ -2899,7 +2872,4 @@
       "no recovery action"
     ]
   }
-
-
-
 ]

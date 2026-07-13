@@ -226,6 +226,18 @@ class ChatbotService:
                 "citations": [],
             }
 
+        # Relevance gate (global search only): if no retrieved chunk is
+        # semantically close enough, reject off-topic questions up front without
+        # invoking the LLM. Scoped chat (a chosen circular) always answers.
+        min_rel = float(self.config.get("RAG_MIN_RELEVANCE", 0.0) or 0.0)
+        if circular_id is None and min_rel > 0:
+            best = max((r.get("dense_score", 0.0) for r in results), default=0.0)
+            if best < min_rel:
+                log.debug("Off-topic query rejected (best dense sim %.3f < %.2f).",
+                          best, min_rel)
+                return {"answer": "I could not find that in the circulars.",
+                        "citations": []}
+
         # Preferred path: the local LLM generates a fluent, grounded answer from
         # the retrieved chunks. Falls back to extractive methods if unavailable.
         llm_ans = self._llm_answer(question, results)

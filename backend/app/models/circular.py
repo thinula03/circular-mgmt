@@ -97,7 +97,9 @@ class Summary(db.Model):
     __tablename__ = "summaries"
 
     id = db.Column(db.Integer, primary_key=True)
-    circular_id = db.Column(db.Integer, db.ForeignKey("circulars.id"), nullable=False)
+    # Unique: exactly one summary per circular (prevents duplicate rows).
+    circular_id = db.Column(db.Integer, db.ForeignKey("circulars.id"),
+                            nullable=False, unique=True)
     summary_text = db.Column(db.Text, nullable=False)        # BART output (FR-13)
     entities = db.Column(db.JSON)                            # spaCy NER (FR-15)
     word_count = db.Column(db.Integer)

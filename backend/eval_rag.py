@@ -57,38 +57,46 @@ def main():
             index.build(Circular.query.filter_by(status="published").all())
         chatbot = get_chatbot(app.config)
 
+        # Map circular number -> id so questions can be answered SCOPED to their
+        # circular (the realistic mode for "this circular" questions).
+        num_to_id = {c.circular_number: c.id for c in Circular.query.all()}
+
         retr_hits = ans_hits = retr_total = ans_total = 0
         print(f"\nEvaluating {len(items)} questions\n" + "=" * 60)
         for it in items:
             q = it["question"]
-            res = chatbot.answer(q, top_k=5)
-            ans = res["answer"]
-            cited = {c["circular_number"] for c in res["citations"]}
-
-            line = f"\nQ: {q}\nA: {ans[:200]}\n   cited: {sorted(cited)}"
-
             exp_c = (it.get("expected_circular") or "").strip()
+            cid = num_to_id.get(exp_c)
+            if exp_c and cid is None:
+                print(f"[skip] '{exp_c}' not in database."); continue
+
+            # --- Retrieval hit-rate (GLOBAL): can the system locate the right
+            #     circular from the question alone? (fast — no generation) ---
             if exp_c:
                 retr_total += 1
-                ok = exp_c in cited
-                retr_hits += ok
-                line += f"\n   retrieval: {'HIT' if ok else 'MISS'} (expected {exp_c})"
+                found = {r["circular_number"] for r in index.search(q, top_k=8)}
+                retr_hits += exp_c in found
+
+            # --- Answer accuracy (SCOPED to the expected circular) ---
+            res = chatbot.answer(q, top_k=8, circular_id=cid)
+            ans = res["answer"]
+            line = f"\nQ: {q}\nA: {ans[:180]}"
 
             kws = it.get("expected_keywords") or []
             if kws:
                 ans_total += 1
                 ok = any(k.lower() in ans.lower() for k in kws)
                 ans_hits += ok
-                line += f"\n   answer:    {'HIT' if ok else 'MISS'} (expected one of {kws})"
+                line += f"\n   answer: {'HIT' if ok else 'MISS'} (expected one of {kws})"
             print(line)
 
         print("\n" + "=" * 60)
         if retr_total:
-            print(f"Retrieval hit-rate: {retr_hits}/{retr_total} "
-                  f"= {retr_hits / retr_total:.0%}")
+            print(f"Global retrieval hit-rate: {retr_hits}/{retr_total} "
+                  f"= {retr_hits / retr_total:.0%}  (finds the right circular)")
         if ans_total:
-            print(f"Answer accuracy:    {ans_hits}/{ans_total} "
-                  f"= {ans_hits / ans_total:.0%}")
+            print(f"Scoped answer accuracy:    {ans_hits}/{ans_total} "
+                  f"= {ans_hits / ans_total:.0%}  (answers from the right circular)")
         db.session.remove()
 
 

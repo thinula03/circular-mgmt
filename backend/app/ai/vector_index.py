@@ -116,7 +116,7 @@ class VectorIndex:
         if not candidates:
             return []
 
-        dense_order = self._dense_ranks(query, candidates)
+        dense_order, dense_scores = self._dense_ranks(query, candidates)
         sparse_order = self._bm25_ranks(query, candidates)
 
         # Reciprocal Rank Fusion (k=60 is the standard constant).
@@ -137,6 +137,7 @@ class VectorIndex:
         for i in order:
             chunk = dict(self._chunks[i])
             chunk["score"] = round(fused[i], 6)
+            chunk["dense_score"] = round(dense_scores.get(i, 0.0), 4)  # cosine sim
             results.append(chunk)
 
         # Diagnostic: which chunks were retrieved for this query.
@@ -145,13 +146,20 @@ class VectorIndex:
         return results
 
     def _dense_ranks(self, query, candidates):
-        """Candidate row indices ordered by SBERT cosine similarity (best first)."""
+        """Candidate row indices ordered by SBERT cosine similarity (best first),
+        plus a {index: cosine_similarity} map for relevance thresholding."""
         model = self._load_model()
         q = model.encode([query], normalize_embeddings=True,
                          convert_to_numpy=True).astype("float32")
-        _, idx = self._index.search(q, self._index.ntotal)  # full ranking
+        scores, idx = self._index.search(q, self._index.ntotal)  # full ranking
         cand = set(candidates)
-        return [int(i) for i in idx[0] if int(i) in cand]
+        order, score_by = [], {}
+        for s, i in zip(scores[0], idx[0]):
+            i = int(i)
+            if i in cand:
+                order.append(i)
+                score_by[i] = float(s)
+        return order, score_by
 
     # ---- BM25 (self-contained, no extra dependency) --------------------
     @staticmethod

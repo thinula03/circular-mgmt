@@ -51,6 +51,10 @@ class Config:
     USE_LLM_SUMMARY = os.getenv("USE_LLM_SUMMARY", "true").lower() == "true"
     # Generate grounded RAG chatbot answers with the local LLM (vs extractive).
     USE_LLM_CHAT = os.getenv("USE_LLM_CHAT", "true").lower() == "true"
+    # Minimum retrieval relevance (SBERT cosine sim of the best chunk). In global
+    # search, if no chunk clears this, the bot replies "not found" without calling
+    # the LLM — rejecting off-topic questions. 0 disables the gate.
+    RAG_MIN_RELEVANCE = float(os.getenv("RAG_MIN_RELEVANCE", "0.25"))
     OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
     OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
     # A smaller model for interactive chat (speed over depth). Falls back to
