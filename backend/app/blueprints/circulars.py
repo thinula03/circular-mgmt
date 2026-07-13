@@ -435,6 +435,9 @@ def upload_circular():
     # ---- extract text via PyMuPDF (FR-07) ----
     try:
         text, page_count = pdf_extract.extract_text_with_meta(save_path)
+    except pdf_extract.PDFExtractionDependencyError as exc:
+        os.remove(save_path)
+        return jsonify({"error": str(exc)}), 503
     except ValueError as exc:
         os.remove(save_path)  # not a valid PDF — clean up
         return jsonify({"error": str(exc)}), 400

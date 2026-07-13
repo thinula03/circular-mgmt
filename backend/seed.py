@@ -31,11 +31,21 @@ SAMPLE_TEXT = (
 )
 
 
+def rebuild_vector_index(app):
+    """Build the demo FAISS index from currently published circulars."""
+    index = get_index(app.config)
+    return index.build(Circular.query.filter_by(status="published").all())
+
+
 def run():
     app = create_app()
     with app.app_context():
         db.create_all()
         if User.query.first():
+            try:
+                rebuild_vector_index(app)
+            except Exception as exc:  # noqa: BLE001
+                print(f"Vector index skipped: {exc}")
             print("Database already seeded — skipping.")
             return
 
@@ -119,11 +129,13 @@ def run():
 
         db.session.commit()
 
-        # ---- seed the vector index stub ----
-        index = get_index(app.config)
-        index.chunk_and_embed("03/2024", SAMPLE_TEXT, section="Full text")
+        # ---- seed the vector index ----
+        try:
+            rebuild_vector_index(app)
+        except Exception as exc:  # noqa: BLE001
+            print(f"Vector index skipped: {exc}")
 
-        print("Seeded: 3 departments, 3 users, 1 sample circular.")
+        print("Seeded: 3 departments, 4 users, 1 sample circular.")
         print("Login with admin / manager / employee  (password: password123)")
 
 

@@ -8,6 +8,7 @@ running, the caller falls back to the BART pipeline.
 import re
 import json
 import logging
+import urllib.error
 import urllib.request
 
 log = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ class LLMSummarizer:
         self.model = config.get("OLLAMA_MODEL", "llama3.2:3b")
         # Optional lighter model for chat; defaults to the summary model.
         self.chat_model = config.get("OLLAMA_CHAT_MODEL") or self.model
+        self.last_model = None
         self.timeout = int(config.get("OLLAMA_TIMEOUT", 300))
         self.keep_alive = config.get("OLLAMA_KEEP_ALIVE", "30m")
         self.max_ctx = int(config.get("OLLAMA_MAX_CTX", 16384))
@@ -45,13 +47,29 @@ class LLMSummarizer:
         self.chat_num_gpu = int(cng) if cng not in (None, "") else None
 
     # ---- availability -------------------------------------------------
-    def available(self) -> bool:
-        """True if the Ollama service is reachable (quick check)."""
+    def _models(self) -> list:
         try:
             with urllib.request.urlopen(f"{self.url}/api/tags", timeout=3) as r:
-                return r.status == 200
+                data = json.loads(r.read().decode("utf-8"))
         except Exception:  # noqa: BLE001 — service down / not installed
-            return False
+            return []
+        return [m.get("name") or m.get("model") for m in data.get("models", [])
+                if m.get("name") or m.get("model")]
+
+    def available(self) -> bool:
+        """True if the Ollama service is reachable (quick check)."""
+        models = self._models()
+        return bool(models)
+
+    def _resolve_model(self, requested: str = None) -> str:
+        models = self._models()
+        wanted = requested or self.model
+        if wanted in models:
+            return wanted
+        if models:
+            log.warning("Ollama model %r is not installed; using %r.", wanted, models[0])
+            return models[0]
+        return wanted
 
     # ---- summarisation ------------------------------------------------
     def summarize(self, text: str, target_words: int) -> str:
@@ -137,8 +155,10 @@ class LLMSummarizer:
     def _chat(self, system: str, user: str, num_ctx: int, num_predict: int,
               model: str = None, num_gpu="inherit") -> str:
         ng = self.num_gpu if num_gpu == "inherit" else num_gpu
+        selected_model = self._resolve_model(model)
+        self.last_model = selected_model
         payload = {
-            "model": model or self.model,
+            "model": selected_model,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -159,9 +179,31 @@ class LLMSummarizer:
             f"{self.url}/api/chat", data=data,
             headers={"Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                out = json.loads(resp.read().decode("utf-8"))
+            return (out.get("message") or {}).get("content", "").strip()
+        except urllib.error.HTTPError as exc:
+            if exc.code != 404:
+                raise
+
+        # Some installed Ollama models expose completion but not chat. Fall back
+        # to /api/generate with a plain prompt so local summarization still works.
+        generate_payload = {
+            "model": selected_model,
+            "prompt": f"{system}\n\n{user}",
+            "stream": False,
+            "keep_alive": self.keep_alive,
+            "options": payload["options"],
+        }
+        gen_req = urllib.request.Request(
+            f"{self.url}/api/generate",
+            data=json.dumps(generate_payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(gen_req, timeout=self.timeout) as resp:
             out = json.loads(resp.read().decode("utf-8"))
-        return (out.get("message") or {}).get("content", "").strip()
+        return (out.get("response") or "").strip()
 
     @staticmethod
     def _build_qa_prompt(question: str, context: str) -> str:

@@ -56,7 +56,28 @@ def ask():
     # Lazily build the index on first use (e.g. after a restart with no rebuild).
     index = get_index(current_app.config)
     if index.is_empty():
-        index.build(Circular.query.filter_by(status="published").all())
+        try:
+            index.build(Circular.query.filter_by(status="published").all())
+        except ModuleNotFoundError as exc:
+            db.session.commit()
+            return jsonify({
+                "answer": (
+                    "Chat search is not ready because a backend dependency is "
+                    f"missing: {exc.name}. Install backend dependencies with "
+                    "`pip install -r requirements.txt`, then restart the server."
+                ),
+                "citations": [],
+                "conversation_id": conv.id,
+                "conversation_title": conv.title,
+            }), 503
+        except Exception as exc:  # noqa: BLE001
+            db.session.commit()
+            return jsonify({
+                "answer": f"Chat search could not start: {exc}",
+                "citations": [],
+                "conversation_id": conv.id,
+                "conversation_title": conv.title,
+            }), 503
 
     chatbot = get_chatbot(current_app.config)
     result = chatbot.answer(question, top_k=8, circular_id=circular_id)

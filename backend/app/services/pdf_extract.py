@@ -23,6 +23,10 @@ _MIN_TEXT_CHARS = 100       # below this, a page is treated as needing OCR
 _ocr_warned = False         # warn about a missing OCR engine only once per run
 
 
+class PDFExtractionDependencyError(RuntimeError):
+    """Raised when the required PDF extraction library is not installed."""
+
+
 def extract_text(file_path: str) -> str:
     """Extract full text from a PDF. Returns '' if PyMuPDF is unavailable."""
     text, _ = extract_text_with_meta(file_path)
@@ -36,7 +40,13 @@ def extract_text_with_meta(file_path: str):
     garbled, in which case Tesseract OCR is attempted. Raises ValueError if the
     file cannot be opened as a valid PDF.
     """
-    import fitz  # PyMuPDF
+    try:
+        import fitz  # PyMuPDF
+    except ModuleNotFoundError as exc:
+        raise PDFExtractionDependencyError(
+            "PDF extraction requires PyMuPDF. Install backend dependencies with "
+            "`pip install -r requirements.txt`."
+        ) from exc
 
     try:
         doc = fitz.open(file_path)

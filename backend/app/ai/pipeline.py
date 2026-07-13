@@ -178,7 +178,12 @@ class AIEngine(NLPPipeline):
             model_used = self._bart_used or self.bart_model_name
         # Key topics: prefer LLM-extracted terms; fall back to KeyBERT-style
         # phrase ranking relevant to the summary (FR-15).
-        entities = self._llm_keywords(summary) or self.extract_keywords(text, reference=summary)
+        try:
+            entities = self._llm_keywords(summary) or self.extract_keywords(
+                text, reference=summary)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Keyword extraction failed (%s); using entity fallback.", exc)
+            entities = self.extract_entities(text)
 
         elapsed = round(time.perf_counter() - start, 2)
         return SummaryResult(
@@ -211,7 +216,8 @@ class AIEngine(NLPPipeline):
                 log.warning("LLM summary failed (%s); falling back to BART.", exc)
                 break
             if self._valid_summary(summary):
-                return summary, self.config.get("OLLAMA_MODEL", "ollama")
+                return summary, self._llm.last_model or self.config.get(
+                    "OLLAMA_MODEL", "ollama")
             log.info("LLM returned unusable output (attempt %d); retrying.", attempt + 1)
         return None, None
 
@@ -551,7 +557,11 @@ class AIEngine(NLPPipeline):
         each chunk's share. Chat/short paths keep the looser bounds. The target is
         capped to the source length so a small chunk is never padded.
         """
-        summarizer = self._load_bart()
+        try:
+            summarizer = self._load_bart()
+        except RuntimeError as exc:
+            log.warning("BART unavailable (%s); using extractive fallback.", exc)
+            return self._simple_extractive_summary(text, target_words)
         src_words = max(1, len(text.split()))
         if tight:
             aim = min(target_words, max(20, int(src_words * 0.9)))  # never pad
@@ -568,3 +578,29 @@ class AIEngine(NLPPipeline):
             truncation=True,
         )
         return result[0]["summary_text"].strip()
+
+    def _simple_extractive_summary(self, text: str, target_words: int) -> str:
+        """Dependency-light fallback when no generative model is installed."""
+        try:
+            sentences = self._sentences(text)
+        except Exception:  # noqa: BLE001
+            sentences = re.split(r"(?<=[.!?])\s+", text)
+        sentences = [re.sub(r"\s+", " ", s).strip() for s in sentences if s.strip()]
+        if not sentences:
+            return " ".join(text.split()[:target_words]).strip()
+
+        picked, used = [], 0
+        for sentence in sentences:
+            words = sentence.split()
+            if len(words) < 4:
+                continue
+            if picked and used + len(words) > target_words:
+                continue
+            picked.append(sentence)
+            used += len(words)
+            if used >= target_words:
+                break
+
+        if not picked:
+            return " ".join(text.split()[:target_words]).strip()
+        return " ".join(picked)
