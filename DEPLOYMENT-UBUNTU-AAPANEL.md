@@ -4,7 +4,7 @@ This deployment uses:
 
 - aaPanel Nginx for HTTPS and the public domain
 - Supervisor for the Flask/Gunicorn backend on `127.0.0.1:5000`
-- PM2 for the compiled React SPA on port `3000`
+- PM2 for the compiled React SPA on port `3009`
 - the existing MySQL database on `127.0.0.1:3306`
 - optional Ollama for local summaries and chat on `127.0.0.1:11434`
 
@@ -133,7 +133,7 @@ actual home shown by `getent passwd www`.
 Verify locally:
 
 ```bash
-curl -I http://127.0.0.1:3000
+curl -I http://127.0.0.1:3009
 sudo -u www -H pm2 status
 ```
 
@@ -176,7 +176,7 @@ nginx -t
 systemctl reload nginx
 ```
 
-Only ports 22, 80, and 443 should be public. Do not open 3000, 5000, 3306, or
+Only ports 22, 80, and 443 should be public. Do not open 3009, 5000, 3306, or
 11434 in aaPanel Security or UFW.
 
 ## 9. Final checks
@@ -213,7 +213,7 @@ production.
 ```bash
 sudo -u www -H pm2 logs circular-frontend --lines 100
 supervisorctl status
-ss -lntp | grep -E ':(3000|5000|3306|11434)'
+ss -lntp | grep -E ':(3009|5000|3306|11434)'
 tail -n 100 /www/wwwroot/circular-mgmt/backend/logs/error.log
 tail -n 100 /www/wwwroot/circular-mgmt/backend/logs/access.log
 ```
