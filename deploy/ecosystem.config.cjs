@@ -3,7 +3,7 @@ module.exports = {
     {
       name: "circular-frontend",
       script: "serve",
-      cwd: "/www/wwwroot/circular/frontend",
+      cwd: "/www/wwwroot/circular-mgmt/frontend",
       env: {
         PM2_SERVE_PATH: "dist",
         PM2_SERVE_PORT: "3000",
@@ -15,4 +15,3 @@ module.exports = {
     },
   ],
 };
-

@@ -8,7 +8,7 @@ This deployment uses:
 - the existing MySQL database on `127.0.0.1:3306`
 - optional Ollama for local summaries and chat on `127.0.0.1:11434`
 
-The examples use `/www/wwwroot/circular` and the Linux user `www`. If the aaPanel
+The examples use `/www/wwwroot/circular-mgmt` and the Linux user `www`. If the aaPanel
 site uses another path or user, change those values in every deployment file.
 
 ## 1. Create the aaPanel site
@@ -17,7 +17,7 @@ In **Website > Add site**, add the real domain. Choose **Static** (not PHP), ena
 SSL, issue a Let's Encrypt certificate, and force HTTPS. The site root should be:
 
 ```text
-/www/wwwroot/circular
+/www/wwwroot/circular-mgmt
 ```
 
 Upload or clone this repository into that directory. Do not upload local virtual
@@ -66,7 +66,7 @@ Characters such as `@`, `:`, `/`, `#`, and `%` in the password must be URL-encod
 ## 4. Create the backend environment
 
 ```bash
-cd /www/wwwroot/circular/backend
+cd /www/wwwroot/circular-mgmt/backend
 python3 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip wheel
 .venv/bin/pip install -r requirements.txt
@@ -85,9 +85,9 @@ openssl rand -hex 48
 Protect runtime data and give the aaPanel web user ownership:
 
 ```bash
-chown -R www:www /www/wwwroot/circular
-chmod 600 /www/wwwroot/circular/backend/.env
-chmod 750 /www/wwwroot/circular/backend/uploads
+chown -R www:www /www/wwwroot/circular-mgmt
+chmod 600 /www/wwwroot/circular-mgmt/backend/.env
+chmod 750 /www/wwwroot/circular-mgmt/backend/uploads
 ```
 
 ## 5. Prepare the local AI models
@@ -96,7 +96,7 @@ The complete transformer cache needs several gigabytes of disk and considerable
 RAM. Download it once as the same `www` user that runs the application:
 
 ```bash
-cd /www/wwwroot/circular/backend
+cd /www/wwwroot/circular-mgmt/backend
 sudo -u www .venv/bin/python download_models.py
 ```
 
@@ -118,10 +118,10 @@ disk. Keep port 11434 private.
 ## 6. Build and start the frontend with PM2
 
 ```bash
-cd /www/wwwroot/circular/frontend
+cd /www/wwwroot/circular-mgmt/frontend
 npm ci
 npm run build
-sudo -u www -H pm2 start /www/wwwroot/circular/deploy/ecosystem.config.cjs
+sudo -u www -H pm2 start /www/wwwroot/circular-mgmt/deploy/ecosystem.config.cjs
 sudo -u www -H pm2 save
 pm2 startup systemd -u www --hp /home/www
 ```
@@ -142,8 +142,8 @@ sudo -u www -H pm2 status
 In aaPanel **Supervisor Manager**, add a daemon named `circular-backend` using:
 
 ```text
-Run directory: /www/wwwroot/circular/backend
-Start command: /www/wwwroot/circular/backend/.venv/bin/gunicorn -c /www/wwwroot/circular/backend/gunicorn_conf.py run:app
+Run directory: /www/wwwroot/circular-mgmt/backend
+Start command: /www/wwwroot/circular-mgmt/backend/.venv/bin/gunicorn -c /www/wwwroot/circular-mgmt/backend/gunicorn_conf.py run:app
 Run user: www
 ```
 
@@ -156,7 +156,7 @@ Verify that the backend is running with the MySQL configuration:
 
 ```bash
 curl -i http://127.0.0.1:5000/health
-tail -n 100 /www/wwwroot/circular/backend/logs/supervisor.log
+tail -n 100 /www/wwwroot/circular-mgmt/backend/logs/supervisor.log
 ```
 
 The health response must report `status: ok` and database `mysql`. The login API
@@ -197,7 +197,7 @@ a summary, open chat, and verify an existing user can see expected circulars.
 Back up the database and uploaded PDFs before updating. Then:
 
 ```bash
-cd /www/wwwroot/circular
+cd /www/wwwroot/circular-mgmt
 git pull
 backend/.venv/bin/pip install -r backend/requirements.txt
 cd frontend && npm ci && npm run build
@@ -214,6 +214,6 @@ production.
 sudo -u www -H pm2 logs circular-frontend --lines 100
 supervisorctl status
 ss -lntp | grep -E ':(3000|5000|3306|11434)'
-tail -n 100 /www/wwwroot/circular/backend/logs/error.log
-tail -n 100 /www/wwwroot/circular/backend/logs/access.log
+tail -n 100 /www/wwwroot/circular-mgmt/backend/logs/error.log
+tail -n 100 /www/wwwroot/circular-mgmt/backend/logs/access.log
 ```
